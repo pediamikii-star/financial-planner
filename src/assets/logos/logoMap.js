@@ -1,228 +1,226 @@
-// src/assets/logos/logoMap.js
-
 // ================= BANKS =================
-import BRI from "./accounts/banks/BRI.png";
-import BNI from "./accounts/banks/BNI.png";
-import BCA from "./accounts/banks/BCA.png";
-import Mandiri from "./accounts/banks/Mandiri.png";
-import BTN from "./accounts/banks/BTN.png";
-import CIMB from "./accounts/banks/CIMB.png";
-import Danamon from "./accounts/banks/Danamon.png";
-import Maybank from "./accounts/banks/MayBank.png";
-import OCBC from "./accounts/banks/OCBC.png";
-import Panin from "./accounts/banks/PaninBank.png";
-import Permata from "./accounts/banks/PermataBank.png";
-import BSI from "./accounts/banks/BSI.png"; // TAMBAH BSI DISINI
+import bri from "./accounts/banks/bri.png";
+import bni from "./accounts/banks/bni.png";
+import bca from "./accounts/banks/bca.png";
+import mandiri from "./accounts/banks/mandiri.png";
+import btn from "./accounts/banks/btn.png";
+import cimb from "./accounts/banks/cimb.png";
+import danamon from "./accounts/banks/danamon.png";
+import maybank from "./accounts/banks/maybank.png";
+import ocbc from "./accounts/banks/ocbc.png";
+import panin from "./accounts/banks/paninbank.png";
+import permata from "./accounts/banks/permatabank.png";
+import bsi from "./accounts/banks/bsi.png";
 
 // ================= DEBIT CARD PROVIDERS =================
-import Visa from "./accounts/banks/debit/Visa.png";
-import Mastercard from "./accounts/banks/debit/Mastercard.png";
-import GPN from "./accounts/banks/debit/GPN.png";
-import JCB from "./accounts/banks/debit/JCB.png";
-import Prima from "./accounts/banks/debit/Prima.png";
-import UnionPay from "./accounts/banks/debit/UnionPay.png";
+import visa from "./accounts/banks/debit/visa.png";
+import mastercard from "./accounts/banks/debit/mastercard.png";
+import gpn from "./accounts/banks/debit/gpn.png";
+import jcb from "./accounts/banks/debit/jcb.png";
+import prima from "./accounts/banks/debit/prima.png";
+import unionpay from "./accounts/banks/debit/unionpay.png";
 
 // ================= DIGITAL BANKS =================
-import Jago from "./accounts/digitalbank/Jago.png";
-import SeaBank from "./accounts/digitalbank/SeaBank.png";
-import Jenius from "./accounts/digitalbank/Jenius.png";
-import Blu from "./accounts/digitalbank/Blu.png";
-import LineBank from "./accounts/digitalbank/LineBank.png";
-import NeoCommerce from "./accounts/digitalbank/BankNeoCommerce.png";
-import AlloBank from "./accounts/digitalbank/AlloBank.png";
+import jago from "./accounts/digitalbank/jago.png";
+import seabank from "./accounts/digitalbank/seabank.png";
+import jenius from "./accounts/digitalbank/jenius.png";
+import blu from "./accounts/digitalbank/blu.png";
+import linebank from "./accounts/digitalbank/linebank.png";
+import neocommerce from "./accounts/digitalbank/bankneocommerce.png";
+import allobank from "./accounts/digitalbank/allobank.png";
 
 // ================= E-WALLETS =================
-import OVO from "./accounts/e-wallets/OVO.png";
-import Gopay from "./accounts/e-wallets/Gopay.png";
-import Dana from "./accounts/e-wallets/Dana.png";
-import Shopeepay from "./accounts/e-wallets/Shopeepay.png";
-import LinkAja from "./accounts/e-wallets/LinkAja.png";
-import DOKU from "./accounts/e-wallets/DOKU.png";
-import AstraPay from "./accounts/e-wallets/AstraPay.png";
-import PayPal from "./accounts/e-wallets/PayPal.png";
-import iSaku from "./accounts/e-wallets/iSaku.png";
+import ovo from "./accounts/e-wallets/ovo.png";
+import gopay from "./accounts/e-wallets/gopay.png";
+import dana from "./accounts/e-wallets/dana.png";
+import shopeepay from "./accounts/e-wallets/shopeepay.png";
+import linkaja from "./accounts/e-wallets/linkaja.png";
+import doku from "./accounts/e-wallets/doku.png";
+import astrapay from "./accounts/e-wallets/astrapay.png";
+import paypal from "./accounts/e-wallets/paypal.png";
+import isaku from "./accounts/e-wallets/isaku.png";
 
 // ================= CASH =================
-import Cash from "./accounts/cash/Cash.png";
+import cash from "./accounts/cash/cash.png";
 
 // ================= LOANS =================
-import Loans from "./accounts/loans/loans.jpg";
+import loans from "./accounts/loans/loans.jpg";
 
 // ================= ASSETS =================
-import Laptop from "./assets/gadgets/Laptop.jpg";
-import Tablet from "./assets/gadgets/Tablet.png";
-import Smartphone from "./assets/gadgets/Smartphone.png";
-import Smartwatch from "./assets/gadgets/Smartwatch.png";
+import laptop from "./assets/gadgets/laptop.jpg";
+import tablet from "./assets/gadgets/tablet.png";
+import smartphone from "./assets/gadgets/smartphone.png";
+import smartwatch from "./assets/gadgets/smartwatch.png";
 
-import Car from "./assets/vehicles/Car.jpg";
-import Motorcycle from "./assets/vehicles/Motorcycle.jpg";
-import Bicycle from "./assets/vehicles/Bicycle.png";
+import car from "./assets/vehicles/car.jpg";
+import motorcycle from "./assets/vehicles/motorcycle.jpg";
+import bicycle from "./assets/vehicles/bicycle.png";
 
-import House from "./assets/properties/House.png";
-import Apartment from "./assets/properties/Apartment.png";
-import RetailBuilding from "./assets/properties/RetailBuilding.png";
+import house from "./assets/properties/house.png";
+import apartment from "./assets/properties/apartment.png";
+import retailbuilding from "./assets/properties/retailbuilding.png";
 
-import LandPlot from "./assets/lands/LandPlot.jpg";
-import FarmField from "./assets/lands/FarmField.png";
+import landplot from "./assets/lands/landplot.jpg";
+import farmfield from "./assets/lands/farmfield.png";
 
-import GoldBar from "./assets/golds/GoldBar.png";
-import GoldJewelry from "./assets/golds/GoldJewelry.png";
+import goldbar from "./assets/golds/goldbar.png";
+import goldjewelry from "./assets/golds/goldjewelry.png";
 
 // ================= CREATORS =================
-import Youtube from "./creators/Youtube.png";
-import Tiktok from "./creators/Tiktok.png";
-import Instagram from "./creators/Instagram.png";
-import Facebook from "./creators/Facebook.png";
-import Fiverr from "./creators/Fiverr.png";
-import Upwork from "./creators/Upwork.png";
-import Shopee from "./creators/Shopee.png";
-import Lynkid from "./creators/Lynkid.png";
-import Blogger from "./creators/Blogger.jpg";
-import X from "./creators/X.jpg";
+import youtube from "./creators/youtube.png";
+import tiktok from "./creators/tiktok.png";
+import instagram from "./creators/instagram.png";
+import facebook from "./creators/facebook.png";
+import fiverr from "./creators/fiverr.png";
+import upwork from "./creators/upwork.png";
+import shopee from "./creators/shopee.png";
+import lynkid from "./creators/lynkid.png";
+import blogger from "./creators/blogger.jpg";
+import x from "./creators/x.jpg";
 
 // ================= LOGO MAP =================
 export const logoMap = {
   // ===== ACCOUNTS =====
   bank: {
-    bri: BRI,
-    bni: BNI,
-    bca: BCA,
-    mandiri: Mandiri,
-    btn: BTN,
-    bsi: BSI, // TAMBAH BSI DISINI
+    bri: bri,
+    bni: bni,
+    bca: bca,
+    mandiri: mandiri,
+    btn: btn,
+    bsi: bsi,
 
-    cimb: CIMB,
-    cimbniaga: CIMB,
-    bankcimbniaga: CIMB,
+    cimb: cimb,
+    cimbniaga: cimb,
+    bankcimbniaga: cimb,
 
-    danamon: Danamon,
-    maybank: Maybank,
-    ocbc: OCBC,
-    panin: Panin,
-    permata: Permata,
+    danamon: danamon,
+    maybank: maybank,
+    ocbc: ocbc,
+    panin: panin,
+    permata: permata,
 
-    default: BCA,
+    default: bca,
   },
 
   // ===== DEBIT CARD PROVIDERS =====
   debit: {
-    visa: Visa,
-    mastercard: Mastercard,
-    gpn: GPN,
-    jcb: JCB,
-    prima: Prima,
-    unionpay: UnionPay,
-    default: GPN,
+    visa: visa,
+    mastercard: mastercard,
+    gpn: gpn,
+    jcb: jcb,
+    prima: prima,
+    unionpay: unionpay,
+    default: gpn,
   },
 
   digitalbank: {
-    jago: Jago,
-    bankjago: Jago,
+    jago: jago,
+    bankjago: jago,
 
-    seabank: SeaBank,
-    bankseabank: SeaBank,
+    seabank: seabank,
+    bankseabank: seabank,
 
-    jenius: Jenius,
-    blu: Blu,
-    linebank: LineBank,
-    neocommerce: NeoCommerce,
-    bankneocommerce: NeoCommerce,
-    allobank: AlloBank,
+    jenius: jenius,
+    blu: blu,
+    linebank: linebank,
+    neocommerce: neocommerce,
+    bankneocommerce: neocommerce,
+    allobank: allobank,
 
-    default: Jago,
+    default: jago,
   },
 
   // alias aman kalau ada data lama
   "digital bank": {
-    jago: Jago,
-    seabank: SeaBank,
-    jenius: Jenius,
-    blu: Blu,
-    linebank: LineBank,
-    neocommerce: NeoCommerce,
-    allobank: AlloBank,
-    default: Jago,
+    jago: jago,
+    seabank: seabank,
+    jenius: jenius,
+    blu: blu,
+    linebank: linebank,
+    neocommerce: neocommerce,
+    allobank: allobank,
+    default: jago,
   },
 
   ewallet: {
-    ovo: OVO,
-    gopay: Gopay,
-    dana: Dana,
-    shopeepay: Shopeepay,
-    linkaja: LinkAja,
-    doku: DOKU,
-    astrapay: AstraPay,
-    paypal: PayPal,
-    isaku: iSaku,
+    ovo: ovo,
+    gopay: gopay,
+    dana: dana,
+    shopeepay: shopeepay,
+    linkaja: linkaja,
+    doku: doku,
+    astrapay: astrapay,
+    paypal: paypal,
+    isaku: isaku,
 
-    default: OVO,
+    default: ovo,
   },
 
   cash: {
-    cash: Cash,
-    wallet: Cash,
-    default: Cash,
+    cash: cash,
+    wallet: cash,
+    default: cash,
   },
 
   loan: {
-    loan: Loans,
-    loans: Loans,
-    piutang: Loans,
-    receivable: Loans,
-    default: Loans,
+    loan: loans,
+    loans: loans,
+    piutang: loans,
+    receivable: loans,
+    default: loans,
   },
 
   // ===== ASSETS =====
   property: {
-    house: House,
-    apartment: Apartment,
-    retailbuilding: RetailBuilding,
+    house: house,
+    apartment: apartment,
+    retailbuilding: retailbuilding,
   },
 
   vehicle: {
-    car: Car,
-    motorcycle: Motorcycle,
-    bycicle: Bicycle, // typo dipertahankan
+    car: car,
+    motorcycle: motorcycle,
+    bycicle: bicycle,
   },
 
   gadget: {
-    laptop: Laptop,
-    tablet: Tablet,
-    smartphone: Smartphone,
-    smartwatch: Smartwatch,
+    laptop: laptop,
+    tablet: tablet,
+    smartphone: smartphone,
+    smartwatch: smartwatch,
   },
 
   land: {
-    landplot: LandPlot,
-    farmfield: FarmField,
+    landplot: landplot,
+    farmfield: farmfield,
   },
 
   gold: {
-    goldbar: GoldBar,
-    goldjewelry: GoldJewelry,
+    goldbar: goldbar,
+    goldjewelry: goldjewelry,
   },
 
   // ===== CREATORS (LENGKAP) =====
   creators: {
-    youtube: Youtube,
-    tiktok: Tiktok,
-    instagram: Instagram,
+    youtube: youtube,
+    tiktok: tiktok,
+    instagram: instagram,
 
-    twitter: X,
-    x: X,
+    twitter: x,
+    x: x,
 
-    facebook: Facebook,
-    blogger: Blogger,
-    blog: Blogger,
+    facebook: facebook,
+    blogger: blogger,
+    blog: blogger,
 
-    fiverr: Fiverr,
-    upwork: Upwork,
-    shopee: Shopee,
-    lynkid: Lynkid,
+    fiverr: fiverr,
+    upwork: upwork,
+    shopee: shopee,
+    lynkid: lynkid,
   },
 
   // ===== FALLBACK =====
   other: {
-    default: Cash,
+    default: cash,
   },
 };
