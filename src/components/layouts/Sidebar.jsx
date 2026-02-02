@@ -12,7 +12,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
-import logo from "../../assets/Logo.jpg";
+import logo from "../../assets/logo.jpg";
 
 // TAMBAH PROPS untuk toggleCollapse
 export default function Sidebar({ close, isCollapsed = false, toggleCollapse }) {

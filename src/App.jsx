@@ -8,6 +8,7 @@ import Investments from "./pages/Investments";
 import Creators from "./pages/Creators";
 import Goals from "./pages/Goals";
 import Layout from "./components/layouts/Layout";
+import BackupPage from './pages/BackupPage'
 
 export default function App() {
   // Cek apakah user sudah login
@@ -48,6 +49,8 @@ export default function App() {
       {/* ===== FALLBACK ROUTE ===== */}
       {/* Redirect semua route yang tidak dikenal ke login */}
       <Route path="*" element={<Navigate to="/login" />} />
+      <Route path="/backup" element={<BackupPage />} />
     </Routes>
+    
   );
 }
