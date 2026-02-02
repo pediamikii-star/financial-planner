@@ -2,37 +2,37 @@ import { useEffect, useState } from "react";
 import { saveAccount, updateAccount } from "../../services/storage";
 
 /* BANK LOGOS */
-import bca from "../../assets/logos/accounts/banks/BCA.png";
-import bni from "../../assets/logos/accounts/banks/BNI.png";
-import bri from "../../assets/logos/accounts/banks/BRI.png";
-import mandiri from "../../assets/logos/accounts/banks/Mandiri.png";
-import btn from "../../assets/logos/accounts/banks/BTN.png";
-import cimb from "../../assets/logos/accounts/banks/CIMB.png";
-import danamon from "../../assets/logos/accounts/banks/Danamon.png";
-import maybank from "../../assets/logos/accounts/banks/MayBank.png";
-import ocbc from "../../assets/logos/accounts/banks/OCBC.png";
-import paninbank from "../../assets/logos/accounts/banks/PaninBank.png";
-import permatabank from "../../assets/logos/accounts/banks/PermataBank.png";
+import bca from "../../assets/logos/accounts/banks/bca.png";
+import bni from "../../assets/logos/accounts/banks/bni.png";
+import bri from "../../assets/logos/accounts/banks/bri.png";
+import mandiri from "../../assets/logos/accounts/banks/mandiri.png";
+import btn from "../../assets/logos/accounts/banks/btn.png";
+import cimb from "../../assets/logos/accounts/banks/cimb.png";
+import danamon from "../../assets/logos/accounts/banks/danamon.png";
+import maybank from "../../assets/logos/accounts/banks/maybank.png";
+import ocbc from "../../assets/logos/accounts/banks/ocbc.png";
+import paninbank from "../../assets/logos/accounts/banks/paninbank.png";
+import permatabank from "../../assets/logos/accounts/banks/permatabank.png";
 
 /* DIGITAL BANK LOGOS */
-import jago from "../../assets/logos/accounts/digitalbank/Jago.png";
-import seabank from "../../assets/logos/accounts/digitalbank/SeaBank.png";
-import bankneocommerce from "../../assets/logos/accounts/digitalbank/BankNeoCommerce.png";
-import allobank from "../../assets/logos/accounts/digitalbank/AlloBank.png";
-import blu from "../../assets/logos/accounts/digitalbank/Blu.png";
-import jenius from "../../assets/logos/accounts/digitalbank/Jenius.png";
-import linebank from "../../assets/logos/accounts/digitalbank/LineBank.png";
+import jago from "../../assets/logos/accounts/digitalbank/jago.png";
+import seabank from "../../assets/logos/accounts/digitalbank/seabank.png";
+import bankneocommerce from "../../assets/logos/accounts/digitalbank/bankneocommerce.png";
+import allobank from "../../assets/logos/accounts/digitalbank/allobank.png";
+import blu from "../../assets/logos/accounts/digitalbank/blu.png";
+import jenius from "../../assets/logos/accounts/digitalbank/jenius.png";
+import linebank from "../../assets/logos/accounts/digitalbank/linebank.png";
 
 /* E-WALLET LOGOS */
-import ovo from "../../assets/logos/accounts/e-wallets/OVO.png";
-import gopay from "../../assets/logos/accounts/e-wallets/Gopay.png";
-import dana from "../../assets/logos/accounts/e-wallets/Dana.png";
-import doku from "../../assets/logos/accounts/e-wallets/DOKU.png";
-import isaku from "../../assets/logos/accounts/e-wallets/iSaku.png";
-import linkaja from "../../assets/logos/accounts/e-wallets/LinkAja.png";
-import paypal from "../../assets/logos/accounts/e-wallets/PayPal.png";
-import astrapay from "../../assets/logos/accounts/e-wallets/AstraPay.png";
-import shopeepay from "../../assets/logos/accounts/e-wallets/Shopeepay.png";
+import ovo from "../../assets/logos/accounts/e-wallets/ovo.png";
+import gopay from "../../assets/logos/accounts/e-wallets/gopay.png";
+import dana from "../../assets/logos/accounts/e-wallets/dana.png";
+import doku from "../../assets/logos/accounts/e-wallets/doku.png";
+import isaku from "../../assets/logos/accounts/e-wallets/isaku.png";
+import linkaja from "../../assets/logos/accounts/e-wallets/linkaja.png";
+import paypal from "../../assets/logos/accounts/e-wallets/paypal.png";
+import astrapay from "../../assets/logos/accounts/e-wallets/astrapay.png";
+import shopeepay from "../../assets/logos/accounts/e-wallets/shopeepay.png";
 
 /* LOANS */
 import loans from "../../assets/logos/accounts/loans/loans.jpg";
