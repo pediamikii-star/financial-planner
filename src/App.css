@@ -1,0 +1,145 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  background-color: #f8fafc; /* Warna background terang */
+}
+
+/* ===== DEFAULT VITE STYLE ===== */
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+  background-color: #ffffff; /* Card putih */
+  border-radius: 12px; /* Tambah border radius */
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Tambah bayangan */
+}
+
+.read-the-docs {
+  color: #666; /* Warna lebih terang */
+}
+
+/* ============================= */
+/* ACCOUNTS PAGE */
+/* ============================= */
+
+.accounts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.account-card {
+  background: #ffffff; /* Ganti dari hijau tua ke putih */
+  border-radius: 16px;
+  padding: 20px;
+  color: #333; /* Teks gelap untuk kontras */
+  border: 1px solid #e2e8f0; /* Tambah border tipis */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); /* Bayangan lebih lembut */
+}
+
+.account-card .header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.account-card img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.account-card small {
+  opacity: 0.7; /* Sedikit lebih terang */
+  font-size: 12px;
+  color: #666; /* Warna abu-abu */
+}
+
+.account-card h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #222; /* Warna lebih gelap untuk judul */
+}
+
+.account-card .amount {
+  margin-top: 8px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #2563eb; /* Biru terang alih-alih teal */
+}
+
+.account-card .detail {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+  color: #666;
+}
+
+/* ============================= */
+/* TAMBAHAN UNTUK ELEMEN LAINNYA */
+/* ============================= */
+
+/* Untuk background body utama */
+body {
+  background-color: #f8fafc !important;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+/* Jika ada sidebar atau elemen lain */
+.sidebar, .tracker-card, .performance-tracker {
+  background-color: #ffffff;
+  color: #333;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Warna untuk teks umum */
+h1, h2, h3, h4, p, span {
+  color: #333; /* Warna gelap untuk kontras dengan background terang */
+}
+
+/* Untuk tombol atau elemen interaktif */
+button, .btn {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
