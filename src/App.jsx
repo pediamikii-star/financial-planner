@@ -1,4 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { getCurrentUser } from "./lib/supabase.js";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Accounts from "./pages/Accounts";
@@ -9,48 +11,65 @@ import Creators from "./pages/Creators";
 import Goals from "./pages/Goals";
 import Layout from "./components/layouts/Layout";
 import BackupPage from './pages/BackupPage'
+import AuthCallback from "./pages/AuthCallback";
 
 export default function App() {
-  // Cek apakah user sudah login
-  const isAuth = localStorage.getItem("auth");
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Initial check
+    checkAuth();
+    
+    // Listen for auth changes
+    const handleAuthChange = (event) => {
+      const { user, event: authEvent } = event.detail;
+      console.log('Auth change detected:', authEvent);
+      setUser(user);
+      
+      // If user logs out, stop loading
+      if (authEvent === 'SIGNED_OUT') {
+        setLoading(false);
+      }
+    };
+    
+    window.addEventListener('supabase:auth', handleAuthChange);
+    
+    return () => {
+      window.removeEventListener('supabase:auth', handleAuthChange);
+    };
+  }, []);
+
+  async function checkAuth() {
+    const user = await getCurrentUser();
+    setUser(user);
+    setLoading(false);
+  }
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
 
   return (
     <Routes>
-      {/* ===== PUBLIC ROUTE ===== */}
-      {/* Halaman login - accessible tanpa auth */}
-      <Route path="/login" element={<Login />} />
+      {/* PUBLIC ROUTES */}
+      <Route path="/login" element={!user ? <Login /> : <Navigate to="/dashboard" />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
 
-      {/* ===== PROTECTED ROUTES WITH LAYOUT ===== */}
-      {/* Semua route di bawah ini menggunakan Layout (dengan sidebar) */}
-      {/* Layout hanya ditampilkan jika user sudah login */}
-      <Route element={isAuth ? <Layout /> : <Navigate to="/login" />}>
-        {/* Dashboard */}
+      {/* PROTECTED ROUTES */}
+      <Route element={user ? <Layout /> : <Navigate to="/login" />}>
         <Route path="/dashboard" element={<Dashboard />} />
-        
-        {/* Accounts */}
         <Route path="/accounts" element={<Accounts />} />
-        
-        {/* Transactions */}
         <Route path="/transactions" element={<Transactions />} />
-        
-        {/* Assets */}
         <Route path="/assets" element={<Assets />} />
-        
-        {/* Investments */}
         <Route path="/investments" element={<Investments />} />
-        
-        {/* Creators */}
         <Route path="/creators" element={<Creators />} />
-        
-        {/* Goals */}
         <Route path="/goals" element={<Goals />} />
+        <Route path="/backup" element={<BackupPage />} />
       </Route>
 
-      {/* ===== FALLBACK ROUTE ===== */}
-      {/* Redirect semua route yang tidak dikenal ke login */}
-      <Route path="*" element={<Navigate to="/login" />} />
-      <Route path="/backup" element={<BackupPage />} />
+      {/* FALLBACK */}
+      <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} />} />
     </Routes>
-    
   );
 }

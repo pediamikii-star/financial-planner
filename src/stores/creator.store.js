@@ -1,5 +1,15 @@
 // src/store/creator.store.js
 
+// ============================================
+// IMPORT SYNC FUNCTIONS DARI store.js
+// ============================================
+import { 
+  getCreators as getCreatorsFromSync,
+  saveCreator as saveCreatorToSync,
+  deleteCreator as deleteCreatorFromSync,
+  syncAllToCloud
+} from '../services/storage.js';
+
 const STORAGE_KEY = "creators";
 
 /* =========================
@@ -19,44 +29,97 @@ function saveToStorage() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(creators));
 }
 
-function loadFromStorage() {
+async function loadFromStorage() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      creators = JSON.parse(raw);
+    // Coba load dari sync system dulu
+    const syncedCreators = await getCreatorsFromSync();
+    
+    if (syncedCreators && syncedCreators.length > 0) {
+      console.log("📥 Loaded creators from sync system:", syncedCreators.length, "items");
       
-      // MIGRATION: Pastikan semua creator memiliki field yang konsisten
-      creators = creators.map(creator => ({
-        id: creator.id,
-        platform: creator.platform,
-        name: creator.name || creator.channel,
-        // PERBAIKAN: Simpan description dengan benar
-        description: creator.description || "",
-        // PERBAIKAN: Simpan income type dengan benar (utamakan type, kemudian incomeType)
-        type: creator.type || creator.incomeType || "",
-        // PASTIKAN BALANCE ADA
-        balance: Number(creator.balance || creator.platformBalance || creator.currentBalance || creator.amount || 0),
-        totalIncome: Number(creator.totalIncome || creator.income || 0),
-        totalWithdrawn: Number(creator.totalWithdrawn || creator.withdrawn || 0),
-        currency: creator.currency || "IDR",
-        createdAt: creator.createdAt || new Date().toISOString(),
-        updatedAt: creator.updatedAt || new Date().toISOString(),
-      }));
+      // Normalize data dari sync
+      creators = syncedCreators.map(creator => normalizeCreatorData(creator));
       
-      console.log("📥 Loaded creators from storage:", creators.length, "items");
-      creators.forEach(c => console.log(`   - ${c.id}: ${c.platform} - ${c.name} - Type: ${c.type}`));
+      // Simpan ke localStorage untuk cache
+      saveToStorage();
+      
     } else {
-      console.log("📭 No creators found in storage");
-      creators = [];
+      // Fallback ke local storage
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        creators = JSON.parse(raw);
+        
+        // MIGRATION: Pastikan semua creator memiliki field yang konsisten
+        creators = creators.map(creator => normalizeCreatorData(creator));
+        
+        console.log("📥 Loaded creators from localStorage:", creators.length, "items");
+      } else {
+        console.log("📭 No creators found in storage");
+        creators = [];
+      }
     }
+    
+    // Log creators yang di-load
+    creators.forEach(c => console.log(`   - ${c.id}: ${c.platform} - ${c.name} - Type: ${c.type}`));
+    
   } catch (error) {
     console.error("❌ Error loading creators from storage:", error);
-    creators = [];
+    // Fallback ke localStorage saja
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      creators = raw ? JSON.parse(raw) : [];
+    } catch {
+      creators = [];
+    }
+  }
+}
+
+// Helper untuk normalize creator data
+function normalizeCreatorData(creator) {
+  return {
+    id: creator.id,
+    platform: creator.platform,
+    name: creator.name || creator.channel || "",
+    description: creator.description || "",
+    type: creator.type || creator.incomeType || "",
+    balance: Number(creator.balance || creator.platformBalance || creator.currentBalance || creator.amount || 0),
+    totalIncome: Number(creator.totalIncome || creator.income || 0),
+    totalWithdrawn: Number(creator.totalWithdrawn || creator.withdrawn || 0),
+    currency: creator.currency || "IDR",
+    createdAt: creator.createdAt || new Date().toISOString(),
+    updatedAt: creator.updatedAt || new Date().toISOString(),
+    // Sync metadata
+    synced: creator.synced || false,
+    synced_at: creator.synced_at || null,
+    // Additional fields
+    lastWithdrawal: creator.lastWithdrawal,
+    lastIncome: creator.lastIncome
+  };
+}
+
+// Helper untuk sync perubahan ke cloud
+async function syncCreatorChange(creator, operation = 'save') {
+  try {
+    const creatorToSync = normalizeCreatorData(creator);
+    
+    if (operation === 'save') {
+      await saveCreatorToSync(creatorToSync);
+      return { success: true, creatorId: creator.id };
+    } else if (operation === 'delete') {
+      await deleteCreatorFromSync(creator.id);
+      return { success: true, creatorId: creator.id };
+    }
+  } catch (error) {
+    console.warn('⚠️ Creator sync to cloud failed (will retry later):', error.message);
+    // Mark as unsynced for later retry
+    creator.synced = false;
+    saveToStorage();
+    return { success: false, error: error.message };
   }
 }
 
 /* =========================
-   PUBLIC STORE API
+   PUBLIC STORE API - DENGAN SYNC SUPPORT
 ========================= */
 export const creatorStore = {
   /* ---------- subscribe ---------- */
@@ -74,8 +137,15 @@ export const creatorStore = {
     return creators;
   },
 
+  async getAllAsync() {
+    // Untuk komponen yang perlu async data
+    await this.refreshFromSync();
+    return creators;
+  },
+
   getById(id) {
     console.log("🔍 Searching creator by ID:", id);
+    
     // Cari dengan berbagai cara karena ID bisa string atau number
     let creator = creators.find((c) => c.id === id);
     
@@ -111,29 +181,46 @@ export const creatorStore = {
   },
 
   /* ---------- actions ---------- */
-  init() {
-    loadFromStorage();
+  async init() {
+    await loadFromStorage();
     notify();
   },
 
-  add(creator) {
+  /* ---------- Refresh data dari cloud ---------- */
+  async refreshFromSync() {
+    try {
+      const syncedCreators = await getCreatorsFromSync();
+      if (syncedCreators && syncedCreators.length > 0) {
+        creators = syncedCreators.map(creator => normalizeCreatorData(creator));
+        saveToStorage();
+        notify();
+        console.log('🔄 Refreshed creators from cloud:', creators.length);
+      }
+    } catch (error) {
+      console.warn('⚠️ Refresh from cloud failed:', error.message);
+    }
+  },
+
+  /* ---------- Add creator dengan sync ---------- */
+  async add(creator) {
     // Generate ID yang konsisten
-    const id = creator.id || Date.now();
+    const id = creator.id || crypto.randomUUID();
     
     const newCreator = {
       id: id,
       platform: creator.platform,
       name: creator.name || creator.channel || "",
       description: creator.description || "",
-      // PERBAIKAN: Simpan income type dengan benar
       type: creator.type || creator.incomeType || "",
-      // PASTIKAN BALANCE ADA DAN NUMERIC
       balance: Number(creator.balance || creator.platformBalance || creator.initialBalance || 0),
       totalIncome: Number(creator.totalIncome || 0),
       totalWithdrawn: Number(creator.totalWithdrawn || 0),
       currency: creator.currency || "IDR",
       createdAt: creator.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      // Sync metadata
+      synced: false,
+      synced_at: null
     };
     
     console.log("➕ Adding new creator:", { 
@@ -147,10 +234,14 @@ export const creatorStore = {
     saveToStorage();
     notify();
     
+    // Sync ke cloud (background)
+    syncCreatorChange(newCreator, 'save');
+    
     return newCreator;
   },
 
-  update(updated) {
+  /* ---------- Update creator dengan sync ---------- */
+  async update(updated) {
     console.log("🔄 Updating creator:", updated.id);
     
     creators = creators.map((creator) =>
@@ -158,28 +249,42 @@ export const creatorStore = {
         ? { 
             ...creator, 
             ...updated,
-            // PERBAIKAN: Pastikan type selalu diupdate jika ada di payload
+            // Pastikan type selalu diupdate jika ada di payload
             type: updated.type !== undefined ? updated.type : creator.type,
             balance: Number(updated.balance !== undefined ? updated.balance : creator.balance),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
+            // Mark for sync
+            synced: false
           }
         : creator
     );
     
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    const updatedCreator = creators.find(c => c.id === updated.id);
+    if (updatedCreator) {
+      syncCreatorChange(updatedCreator, 'save');
+    }
   },
 
-  remove(id) {
-    creators = creators.filter(
-      (creator) => creator.id !== id
-    );
+  /* ---------- Remove creator dengan sync ---------- */
+  async remove(id) {
+    const creatorToDelete = creators.find(c => c.id === id);
+    
+    if (!creatorToDelete) return;
+    
+    creators = creators.filter((creator) => creator.id !== id);
     saveToStorage();
     notify();
+    
+    // Sync delete ke cloud (background)
+    syncCreatorChange(creatorToDelete, 'delete');
   },
 
-  /* ---------- WITHDRAW METHOD ---------- */
-  withdrawFromCreator(creatorId, amount) {
+  /* ---------- WITHDRAW METHOD dengan sync ---------- */
+  async withdrawFromCreator(creatorId, amount) {
     console.log("💸 withdrawFromCreator called with:", { creatorId, amount });
     
     let creator = null;
@@ -215,9 +320,13 @@ export const creatorStore = {
     creator.totalWithdrawn = (Number(creator.totalWithdrawn) || 0) + withdrawAmount;
     creator.lastWithdrawal = new Date().toISOString();
     creator.updatedAt = new Date().toISOString();
+    creator.synced = false;
     
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    syncCreatorChange(creator, 'save');
     
     const result = {
       success: true,
@@ -233,8 +342,8 @@ export const creatorStore = {
     return result;
   },
 
-  /* ---------- ADD INCOME METHOD ---------- */
-  addIncome(creatorId, amount) {
+  /* ---------- ADD INCOME METHOD dengan sync ---------- */
+  async addIncome(creatorId, amount) {
     const creator = this.getById(creatorId);
     
     if (!creator) {
@@ -252,9 +361,13 @@ export const creatorStore = {
     creator.totalIncome = (Number(creator.totalIncome) || 0) + incomeAmount;
     creator.lastIncome = new Date().toISOString();
     creator.updatedAt = new Date().toISOString();
+    creator.synced = false;
     
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    syncCreatorChange(creator, 'save');
     
     return {
       success: true,
@@ -285,7 +398,7 @@ export const creatorStore = {
   },
 
   /* ---------- SEED INITIAL DATA ---------- */
-  seedInitialData() {
+  async seedInitialData() {
     console.log("🌱 Seeding initial creator data...");
     const initialData = [
       {
@@ -320,18 +433,115 @@ export const creatorStore = {
       },
     ];
     
-    creators = initialData;
+    creators = initialData.map(creator => ({
+      ...creator,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      currency: "IDR",
+      synced: false,
+      synced_at: null
+    }));
+    
     saveToStorage();
     notify();
+    
+    // Sync initial data ke cloud
+    for (const creator of creators) {
+      await syncCreatorChange(creator, 'save');
+    }
     
     console.log("✅ Seeded", creators.length, "initial creators");
     return creators;
   },
 
   /* ---------- RESET ALL ---------- */
-  resetAll() {
+  async resetAll() {
     creators = [];
     saveToStorage();
     notify();
   },
+
+  /* ---------- NEW: SYNC UTILITY METHODS ---------- */
+  
+  // Manual sync untuk creator tertentu
+  async syncCreatorToCloud(creatorId) {
+    const creator = creators.find(c => c.id === creatorId);
+    if (!creator) return { success: false, error: 'Creator not found' };
+    
+    try {
+      await saveCreatorToSync(creator);
+      creator.synced = true;
+      creator.synced_at = new Date().toISOString();
+      saveToStorage();
+      notify();
+      return { success: true, creatorId };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Sync semua creators ke cloud
+  async syncAllCreatorsToCloud() {
+    const results = [];
+    
+    for (const creator of creators) {
+      if (!creator.synced) {
+        try {
+          await saveCreatorToSync(creator);
+          creator.synced = true;
+          creator.synced_at = new Date().toISOString();
+          results.push({ creatorId: creator.id, success: true });
+        } catch (error) {
+          results.push({ creatorId: creator.id, success: false, error: error.message });
+        }
+      } else {
+        results.push({ creatorId: creator.id, success: true, message: 'Already synced' });
+      }
+    }
+    
+    if (results.length > 0) {
+      saveToStorage();
+      notify();
+    }
+    
+    return results;
+  },
+
+  // Cek sync status untuk semua creators
+  getSyncStatus() {
+    const total = creators.length;
+    const synced = creators.filter(c => c.synced).length;
+    const unsynced = total - synced;
+    
+    return {
+      total,
+      synced,
+      unsynced,
+      percentage: total > 0 ? Math.round((synced / total) * 100) : 0
+    };
+  },
+
+  // Retry sync untuk yang gagal
+  async retryFailedSyncs() {
+    const unsyncedCreators = creators.filter(c => !c.synced);
+    const results = [];
+    
+    for (const creator of unsyncedCreators) {
+      try {
+        await saveCreatorToSync(creator);
+        creator.synced = true;
+        creator.synced_at = new Date().toISOString();
+        results.push({ creatorId: creator.id, success: true });
+      } catch (error) {
+        results.push({ creatorId: creator.id, success: false, error: error.message });
+      }
+    }
+    
+    if (results.length > 0) {
+      saveToStorage();
+      notify();
+    }
+    
+    return results;
+  }
 };

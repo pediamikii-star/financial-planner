@@ -110,6 +110,10 @@ function FilterDropdown({ filterType, setFilterType, isOpen, setIsOpen, typeOpti
    SECTION COMPONENT (SIMPLE TANPA COUNTER)
 ====================== */
 function Section({ title, data, onEdit }) {
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return null;
+  }
+
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
@@ -182,7 +186,19 @@ export default function Accounts() {
   const [filterOpen, setFilterOpen] = useState(false);
 
   function loadAccounts() {
-    setAccounts(getAccounts());
+    try {
+      const loadedAccounts = getAccounts();
+      // Validasi: pastikan selalu array
+      if (Array.isArray(loadedAccounts)) {
+        setAccounts(loadedAccounts);
+      } else {
+        console.error('getAccounts() returned non-array:', loadedAccounts);
+        setAccounts([]);
+      }
+    } catch (error) {
+      console.error('Error loading accounts:', error);
+      setAccounts([]);
+    }
   }
 
   useEffect(() => {
@@ -193,9 +209,16 @@ export default function Accounts() {
   }, []);
 
   /* ======================
-     SORTING FUNCTION
+     SORTING FUNCTION - DIPERBAIKI
   ====================== */
   function sortAccounts(accountsList) {
+    // FIX: Validasi input sebelum menggunakan spread operator
+    if (!accountsList || !Array.isArray(accountsList)) {
+      console.warn('sortAccounts received non-array:', accountsList);
+      return [];
+    }
+    
+    // Buat salinan array untuk diurutkan
     const sorted = [...accountsList];
     
     switch(sortBy) {
@@ -237,9 +260,14 @@ export default function Accounts() {
   }
 
   /* ======================
-     FILTERING FUNCTION
+     FILTERING FUNCTION - DIPERBAIKI
   ====================== */
   function filterAccounts(accountsList) {
+    // FIX: Validasi input
+    if (!accountsList || !Array.isArray(accountsList)) {
+      return [];
+    }
+    
     if (filterType === "all") return accountsList;
     return accountsList.filter(account => 
       getMappedType(account.type) === filterType
@@ -249,18 +277,35 @@ export default function Accounts() {
   /* ======================
      PROCESS DATA DENGAN FILTER & SORT
   ====================== */
+  // Pastikan accounts adalah array valid
+  const accountsArray = Array.isArray(accounts) ? accounts : [];
+  
   // 1. Filter dulu berdasarkan type
-  const filteredAccounts = filterAccounts(accounts);
+  const filteredAccounts = filterAccounts(accountsArray);
   
   // 2. Sort hasil filter
   const sortedAccounts = sortAccounts(filteredAccounts);
   
   // 3. Group berdasarkan type untuk ditampilkan
-  const banks = sortedAccounts.filter(a => getMappedType(a.type) === "bank");
-  const digitalBanks = sortedAccounts.filter(a => getMappedType(a.type) === "digital-bank");
-  const ewallets = sortedAccounts.filter(a => getMappedType(a.type) === "e-wallet");
-  const cashes = sortedAccounts.filter(a => getMappedType(a.type) === "cash");
-  const loans = sortedAccounts.filter(a => getMappedType(a.type) === "loans");
+  const banks = Array.isArray(sortedAccounts) 
+    ? sortedAccounts.filter(a => getMappedType(a.type) === "bank")
+    : [];
+    
+  const digitalBanks = Array.isArray(sortedAccounts)
+    ? sortedAccounts.filter(a => getMappedType(a.type) === "digital-bank")
+    : [];
+    
+  const ewallets = Array.isArray(sortedAccounts)
+    ? sortedAccounts.filter(a => getMappedType(a.type) === "e-wallet")
+    : [];
+    
+  const cashes = Array.isArray(sortedAccounts)
+    ? sortedAccounts.filter(a => getMappedType(a.type) === "cash")
+    : [];
+    
+  const loans = Array.isArray(sortedAccounts)
+    ? sortedAccounts.filter(a => getMappedType(a.type) === "loans")
+    : [];
 
   /* ======================
      TOTALS (SEMUA POSITIF)
@@ -296,8 +341,10 @@ export default function Accounts() {
   /* ======================
      CALCULATE METRICS
   ====================== */
-  const averageBalance = sortedAccounts.length > 0 
-    ? Math.round(totalBalance / sortedAccounts.length)
+  const sortedAccountsLength = Array.isArray(sortedAccounts) ? sortedAccounts.length : 0;
+  
+  const averageBalance = sortedAccountsLength > 0 
+    ? Math.round(totalBalance / sortedAccountsLength)
     : 0;
   
   const bankPercentage = totalBalance > 0 
@@ -305,7 +352,7 @@ export default function Accounts() {
     : 0;
   
   // Find largest account
-  const largestAccount = sortedAccounts.length > 0 
+  const largestAccount = sortedAccountsLength > 0 && Array.isArray(sortedAccounts)
     ? sortedAccounts.reduce((max, acc) => 
         Number(acc.balance || 0) > Number(max.balance || 0) ? acc : max
       )
@@ -315,6 +362,7 @@ export default function Accounts() {
   const typeOptions = TYPE_OPTIONS;
 
   const onEdit = (acc) => {
+    if (!acc) return;
     setEditAccount(acc);
     setShowModal(true);
   };
@@ -392,7 +440,7 @@ export default function Accounts() {
                   <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-emerald-100/50 rounded-full mb-4">
                     <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div>
                     <span className="text-xs font-medium text-emerald-700">
-                      {sortedAccounts.length} accounts registered
+                      {sortedAccountsLength} account{sortedAccountsLength !== 1 ? 's' : ''} registered
                     </span>
                   </div>
                 </div>
@@ -431,7 +479,7 @@ export default function Accounts() {
           </div>
 
           {/* ===== CARD KANAN: BREAKDOWN - PERBAIKAN: HAPUS SCROLL & TEKS ===== */}
-<div className="relative bg-gradient-to-br from-emerald-50 via-white to-emerald-100/30 rounded-2xl p-6 shadow-lg border border-emerald-200/50 
+          <div className="relative bg-gradient-to-br from-emerald-50 via-white to-emerald-100/30 rounded-2xl p-6 shadow-lg border border-emerald-200/50 
   h-[480px] min-h-[480px] max-h-[480px] overflow-hidden flex flex-col">
             
             {/* Background decoration */}
@@ -525,7 +573,7 @@ export default function Accounts() {
           <div>
             <h2 className="text-xl font-bold text-slate-800">Accounts List</h2>
             <p className="text-slate-600 text-sm font-medium mt-1">
-              {sortedAccounts.length} account{sortedAccounts.length !== 1 ? 's' : ''} registered
+              {sortedAccountsLength} account{sortedAccountsLength !== 1 ? 's' : ''} registered
               {filterType !== "all" && (
                 <span className="text-blue-600 font-semibold ml-2">
                   (Filtered: {formatTypeTitle(filterType)})
@@ -576,20 +624,20 @@ export default function Accounts() {
         </div>
 
         {/* Empty State dengan kondisi filter */}
-        {sortedAccounts.length === 0 && (
+        {sortedAccountsLength === 0 && (
           <div className="text-center py-12 border-2 border-dashed border-slate-300 rounded-2xl mt-8 bg-gradient-to-b from-white to-slate-50/50">
             <div className="text-6xl mb-4 text-slate-300">🏦</div>
             <h3 className="text-xl font-bold mb-3 text-slate-800">
-              {accounts.length === 0 ? "No Accounts Yet" : "No Accounts Match Your Filter"}
+              {accountsArray.length === 0 ? "No Accounts Yet" : "No Accounts Match Your Filter"}
             </h3>
             <p className="text-slate-600 mb-6 max-w-md mx-auto">
-              {accounts.length === 0 
+              {accountsArray.length === 0 
                 ? "Start your financial journey by creating your first account" 
                 : "Try adjusting your filter settings to see more results"}
             </p>
             <button
               onClick={() => {
-                if (accounts.length === 0) {
+                if (accountsArray.length === 0) {
                   setShowModal(true);
                 } else {
                   setFilterType("all");
@@ -597,20 +645,20 @@ export default function Accounts() {
               }}
               className="group bg-gradient-to-r from-blue-500 to-cyan-400 hover:from-blue-600 hover:to-cyan-500 px-6 py-3 rounded-lg font-semibold text-white transition-all shadow-md hover:shadow-lg hover:scale-[1.02]"
             >
-              {accounts.length === 0 ? "Create First Account" : "Clear All Filters"}
+              {accountsArray.length === 0 ? "Create First Account" : "Clear All Filters"}
             </button>
           </div>
         )}
 
         {/* Footer dengan info filtered/sorted */}
-        {sortedAccounts.length > 0 && (
+        {sortedAccountsLength > 0 && (
           <div className="mt-8 pt-6 border-t border-slate-300/50">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-4">
                 <div className="px-3 py-1.5 bg-gradient-to-r from-slate-100 to-white rounded-lg">
-                  <span className="font-bold text-slate-900">{sortedAccounts.length}</span>
+                  <span className="font-bold text-slate-900">{sortedAccountsLength}</span>
                   <span className="text-slate-600 ml-1">
-                    account{sortedAccounts.length !== 1 ? 's' : ''} total
+                    account{sortedAccountsLength !== 1 ? 's' : ''} total
                   </span>
                   {filterType !== "all" && (
                     <span className="ml-3 px-2 py-1 bg-gradient-to-r from-blue-100 to-blue-50 text-blue-600 font-semibold text-xs rounded-md">

@@ -130,24 +130,68 @@ const syncService = {
 }
 
 /* ======================================
-   ACCOUNTS STORAGE (DIMODIFIKASI)
+   KEYS CONSTANTS
 ====================================== */
 
 const ACCOUNTS_KEY = "accounts";
 const ACCOUNTS_TABLE = "accounts";
+const ASSETS_KEY = "assets";
+const ASSETS_TABLE = "assets";
+const INVESTMENTS_KEY = "investments";
+const INVESTMENTS_TABLE = "investments";
+const CREATORS_KEY = "creators";
+const CREATORS_TABLE = "creators";
+const GOALS_KEY = "goals";
+const GOALS_TABLE = "goals";
+const TRANSACTIONS_KEY = "transactions";
+const TRANSACTIONS_TABLE = "transactions";
+
+/* ======================================
+   HELPER FUNCTIONS
+====================================== */
+
+function normalizeCategory(category = "") {
+  const c = category.toLowerCase();
+  if (c.includes("property")) return "property";
+  if (c.includes("vehicle")) return "vehicle";
+  if (c.includes("gold")) return "gold";
+  if (c.includes("land")) return "land";
+  if (c.includes("gadget")) return "gadget";
+  return "other";
+}
+
+function getLocalData(key) {
+  try {
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error(`Error parsing ${key} from localStorage:`, error);
+    return [];
+  }
+}
+
+function saveLocalData(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.error(`Error saving ${key} to localStorage:`, error);
+  }
+}
+
+/* ======================================
+   ACCOUNTS STORAGE
+====================================== */
 
 export async function getAccounts() {
-  // Jika ada user, merge dengan cloud data
   if (await syncService.shouldSync()) {
     return await syncService.mergeData(ACCOUNTS_KEY, ACCOUNTS_TABLE)
   }
-  return JSON.parse(localStorage.getItem(ACCOUNTS_KEY)) || [];
+  return getLocalData(ACCOUNTS_KEY);
 }
 
 export async function saveAccount(account) {
   const accounts = await getAccounts()
   
-  // Generate ID jika belum ada
   if (!account.id) {
     account.id = crypto.randomUUID()
     account.created_at = new Date().toISOString()
@@ -156,7 +200,6 @@ export async function saveAccount(account) {
   account.updated_at = new Date().toISOString()
   account.synced = false
   
-  // Cek apakah update atau create
   const existingIndex = accounts.findIndex(acc => acc.id === account.id)
   
   if (existingIndex >= 0) {
@@ -165,10 +208,8 @@ export async function saveAccount(account) {
     accounts.push(account)
   }
   
-  // Simpan ke localStorage
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
+  saveLocalData(ACCOUNTS_KEY, accounts)
   
-  // Sync ke cloud jika perlu
   if (await syncService.shouldSync()) {
     await syncService.syncToSupabase(ACCOUNTS_TABLE, [account], {
       markAsSynced: true
@@ -180,7 +221,7 @@ export async function saveAccount(account) {
 }
 
 export async function updateAccount(updated) {
-  return await saveAccount(updated) // Gunakan saveAccount yang sudah handle update
+  return await saveAccount(updated)
 }
 
 export async function deleteAccount(id) {
@@ -189,11 +230,9 @@ export async function deleteAccount(id) {
   
   if (!accountToDelete) return
   
-  // Hapus dari local
   accounts = accounts.filter(acc => acc.id !== id)
-  localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
+  saveLocalData(ACCOUNTS_KEY, accounts)
   
-  // Hapus dari cloud jika sudah synced
   if (accountToDelete.synced && (await syncService.shouldSync())) {
     try {
       const user = await getCurrentUser()
@@ -213,23 +252,23 @@ export async function deleteAccount(id) {
 }
 
 /* ======================================
-   ASSETS STORAGE (DIMODIFIKASI)
+   ASSETS STORAGE
 ====================================== */
-
-const ASSETS_KEY = "assets";
-const ASSETS_TABLE = "assets";
 
 export async function getAssets() {
   if (await syncService.shouldSync()) {
     return await syncService.mergeData(ASSETS_KEY, ASSETS_TABLE)
   }
-  return JSON.parse(localStorage.getItem(ASSETS_KEY)) || [];
+  return getLocalData(ASSETS_KEY);
+}
+
+export function getAssetsSync() {
+  return getLocalData(ASSETS_KEY);
 }
 
 export async function saveAsset(asset) {
   const assets = await getAssets()
   
-  // Generate ID jika belum ada
   if (!asset.id) {
     asset.id = crypto.randomUUID()
     asset.created_at = new Date().toISOString()
@@ -246,7 +285,7 @@ export async function saveAsset(asset) {
     assets.push(asset)
   }
   
-  localStorage.setItem(ASSETS_KEY, JSON.stringify(assets))
+  saveLocalData(ASSETS_KEY, assets)
   
   if (await syncService.shouldSync()) {
     await syncService.syncToSupabase(ASSETS_TABLE, [asset], {
@@ -269,7 +308,7 @@ export async function deleteAsset(id) {
   if (!assetToDelete) return
   
   assets = assets.filter(a => a.id !== id)
-  localStorage.setItem(ASSETS_KEY, JSON.stringify(assets))
+  saveLocalData(ASSETS_KEY, assets)
   
   if (assetToDelete.synced && (await syncService.shouldSync())) {
     try {
@@ -290,17 +329,14 @@ export async function deleteAsset(id) {
 }
 
 /* ======================================
-   INVESTMENTS STORAGE (DIMODIFIKASI)
+   INVESTMENTS STORAGE
 ====================================== */
-
-const INVESTMENTS_KEY = "investments";
-const INVESTMENTS_TABLE = "investments";
 
 export async function getInvestments() {
   if (await syncService.shouldSync()) {
     return await syncService.mergeData(INVESTMENTS_KEY, INVESTMENTS_TABLE)
   }
-  return JSON.parse(localStorage.getItem(INVESTMENTS_KEY)) || [];
+  return getLocalData(INVESTMENTS_KEY);
 }
 
 export async function saveInvestment(investment) {
@@ -322,7 +358,7 @@ export async function saveInvestment(investment) {
     investments.push(investment)
   }
   
-  localStorage.setItem(INVESTMENTS_KEY, JSON.stringify(investments))
+  saveLocalData(INVESTMENTS_KEY, investments)
   
   if (await syncService.shouldSync()) {
     await syncService.syncToSupabase(INVESTMENTS_TABLE, [investment], {
@@ -341,7 +377,7 @@ export async function deleteInvestment(id) {
   if (!investmentToDelete) return
   
   investments = investments.filter(i => i.id !== id)
-  localStorage.setItem(INVESTMENTS_KEY, JSON.stringify(investments))
+  saveLocalData(INVESTMENTS_KEY, investments)
   
   if (investmentToDelete.synced && (await syncService.shouldSync())) {
     try {
@@ -362,170 +398,248 @@ export async function deleteInvestment(id) {
 }
 
 /* ======================================
-   SYNC UTILITIES (FUNGSI BARU)
+   CREATORS STORAGE
 ====================================== */
 
-// Manual sync function (bisa dipanggil dari UI)
-export async function syncAllToCloud() {
-  const user = await getCurrentUser()
-  if (!user) {
-    return { success: false, message: 'Silakan login dulu' }
+export async function getCreators() {
+  if (await syncService.shouldSync()) {
+    return await syncService.mergeData(CREATORS_KEY, CREATORS_TABLE)
   }
+  return getLocalData(CREATORS_KEY);
+}
 
-  const results = []
+export async function saveCreator(creator) {
+  const creators = await getCreators()
   
-  // Sync semua data
-  const syncJobs = [
-    { key: ACCOUNTS_KEY, table: ACCOUNTS_TABLE, name: 'Akun' },
-    { key: ASSETS_KEY, table: ASSETS_TABLE, name: 'Aset' },
-    { key: INVESTMENTS_KEY, table: INVESTMENTS_TABLE, name: 'Investasi' }
-  ]
+  if (!creator.id) {
+    creator.id = crypto.randomUUID()
+    creator.created_at = new Date().toISOString()
+  }
+  
+  creator.updated_at = new Date().toISOString()
+  creator.synced = false
+  
+  const existingIndex = creators.findIndex(c => c.id === creator.id)
+  
+  if (existingIndex >= 0) {
+    creators[existingIndex] = creator
+  } else {
+    creators.push(creator)
+  }
+  
+  saveLocalData(CREATORS_KEY, creators)
+  
+  if (await syncService.shouldSync()) {
+    await syncService.syncToSupabase(CREATORS_TABLE, [creator], {
+      markAsSynced: true
+    })
+  }
+  
+  window.dispatchEvent(new Event("creatorsUpdated"))
+  return creator
+}
 
-  for (const job of syncJobs) {
+export async function updateCreator(updated) {
+  return await saveCreator(updated)
+}
+
+export async function deleteCreator(id) {
+  let creators = await getCreators()
+  const creatorToDelete = creators.find(c => c.id === id)
+  
+  if (!creatorToDelete) return
+  
+  creators = creators.filter(c => c.id !== id)
+  saveLocalData(CREATORS_KEY, creators)
+  
+  if (creatorToDelete.synced && (await syncService.shouldSync())) {
     try {
-      const data = JSON.parse(localStorage.getItem(job.key) || '[]')
-      const unsyncedData = data.filter(item => !item.synced)
-      
-      if (unsyncedData.length > 0) {
-        const result = await syncService.syncToSupabase(job.table, unsyncedData, {
-          markAsSynced: true
-        })
-        
-        results.push({
-          type: job.name,
-          success: result.success,
-          count: unsyncedData.length,
-          error: result.error
-        })
-      } else {
-        results.push({
-          type: job.name,
-          success: true,
-          count: 0,
-          message: 'Sudah up-to-date'
-        })
+      const user = await getCurrentUser()
+      if (user) {
+        await supabase
+          .from(CREATORS_TABLE)
+          .delete()
+          .eq('local_id', id)
+          .eq('user_id', user.id)
       }
     } catch (error) {
-      results.push({
-        type: job.name,
-        success: false,
-        error: error.message
-      })
+      console.error('Failed to delete from cloud:', error)
     }
   }
-
-  return results
+  
+  window.dispatchEvent(new Event("creatorsUpdated"))
 }
 
-// Load semua dari cloud (untuk device baru)
-export async function loadAllFromCloud() {
-  const user = await getCurrentUser()
-  if (!user) {
-    return { success: false, message: 'Silakan login dulu' }
+/* ======================================
+   GOALS STORAGE
+====================================== */
+
+export async function getGoals() {
+  if (await syncService.shouldSync()) {
+    return await syncService.mergeData(GOALS_KEY, GOALS_TABLE)
   }
+  return getLocalData(GOALS_KEY);
+}
 
-  try {
-    const [accounts, assets, investments] = await Promise.all([
-      syncService.loadFromSupabase(ACCOUNTS_TABLE),
-      syncService.loadFromSupabase(ASSETS_TABLE),
-      syncService.loadFromSupabase(INVESTMENTS_TABLE)
-    ])
+export async function saveGoal(goal) {
+  const goals = await getGoals()
+  
+  if (!goal.id) {
+    goal.id = crypto.randomUUID()
+    goal.created_at = new Date().toISOString()
+  }
+  
+  goal.updated_at = new Date().toISOString()
+  goal.synced = false
+  
+  const existingIndex = goals.findIndex(g => g.id === goal.id)
+  
+  if (existingIndex >= 0) {
+    goals[existingIndex] = goal
+  } else {
+    goals.push(goal)
+  }
+  
+  saveLocalData(GOALS_KEY, goals)
+  
+  if (await syncService.shouldSync()) {
+    await syncService.syncToSupabase(GOALS_TABLE, [goal], {
+      markAsSynced: true
+    })
+  }
+  
+  window.dispatchEvent(new Event("goalsUpdated"))
+  return goal
+}
 
-    // Simpan ke localStorage
-    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
-    localStorage.setItem(ASSETS_KEY, JSON.stringify(assets))
-    localStorage.setItem(INVESTMENTS_KEY, JSON.stringify(investments))
+export async function updateGoal(updated) {
+  return await saveGoal(updated)
+}
 
-    // Trigger update events
-    window.dispatchEvent(new Event("accountsUpdated"))
-    window.dispatchEvent(new Event("assetsUpdated"))
-    window.dispatchEvent(new Event("investmentsUpdated"))
-
-    return {
-      success: true,
-      counts: {
-        accounts: accounts.length,
-        assets: assets.length,
-        investments: investments.length
+export async function deleteGoal(id) {
+  let goals = await getGoals()
+  const goalToDelete = goals.find(g => g.id === id)
+  
+  if (!goalToDelete) return
+  
+  goals = goals.filter(g => g.id !== id)
+  saveLocalData(GOALS_KEY, goals)
+  
+  if (goalToDelete.synced && (await syncService.shouldSync())) {
+    try {
+      const user = await getCurrentUser()
+      if (user) {
+        await supabase
+          .from(GOALS_TABLE)
+          .delete()
+          .eq('local_id', id)
+          .eq('user_id', user.id)
       }
-    }
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
+    } catch (error) {
+      console.error('Failed to delete from cloud:', error)
     }
   }
+  
+  window.dispatchEvent(new Event("goalsUpdated"))
 }
 
-// Cek status sync
-export async function getSyncStatus() {
-  const user = await getCurrentUser()
-  const online = navigator.onLine
+/* ======================================
+   TRANSACTIONS STORAGE
+====================================== */
+
+export async function getTransactions() {
+  if (await syncService.shouldSync()) {
+    return await syncService.mergeData(TRANSACTIONS_KEY, TRANSACTIONS_TABLE)
+  }
+  return getLocalData(TRANSACTIONS_KEY);
+}
+
+export async function saveTransaction(transaction) {
+  const transactions = await getTransactions()
   
-  const data = {
-    accounts: JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || '[]'),
-    assets: JSON.parse(localStorage.getItem(ASSETS_KEY) || '[]'),
-    investments: JSON.parse(localStorage.getItem(INVESTMENTS_KEY) || '[]')
+  if (!transaction.id) {
+    transaction.id = crypto.randomUUID()
+    transaction.created_at = new Date().toISOString()
   }
   
-  return {
-    user: user ? 'Logged in' : 'Not logged in',
-    online,
-    totals: {
-      accounts: data.accounts.length,
-      assets: data.assets.length,
-      investments: data.investments.length
-    },
-    unsynced: {
-      accounts: data.accounts.filter(d => !d.synced).length,
-      assets: data.assets.filter(d => !d.synced).length,
-      investments: data.investments.filter(d => !d.synced).length
+  transaction.updated_at = new Date().toISOString()
+  transaction.synced = false
+  
+  const existingIndex = transactions.findIndex(t => t.id === transaction.id)
+  
+  if (existingIndex >= 0) {
+    transactions[existingIndex] = transaction
+  } else {
+    transactions.push(transaction)
+  }
+  
+  saveLocalData(TRANSACTIONS_KEY, transactions)
+  
+  if (await syncService.shouldSync()) {
+    await syncService.syncToSupabase(TRANSACTIONS_TABLE, [transaction], {
+      markAsSynced: true
+    })
+  }
+  
+  window.dispatchEvent(new Event("transactionsUpdated"))
+  return transaction
+}
+
+export async function updateTransaction(updated) {
+  return await saveTransaction(updated)
+}
+
+export async function deleteTransaction(id) {
+  let transactions = await getTransactions()
+  const transactionToDelete = transactions.find(t => t.id === id)
+  
+  if (!transactionToDelete) return
+  
+  transactions = transactions.filter(t => t.id !== id)
+  saveLocalData(TRANSACTIONS_KEY, transactions)
+  
+  if (transactionToDelete.synced && (await syncService.shouldSync())) {
+    try {
+      const user = await getCurrentUser()
+      if (user) {
+        await supabase
+          .from(TRANSACTIONS_TABLE)
+          .delete()
+          .eq('local_id', id)
+          .eq('user_id', user.id)
+      }
+    } catch (error) {
+      console.error('Failed to delete from cloud:', error)
     }
   }
+  
+  window.dispatchEvent(new Event("transactionsUpdated"))
 }
 
 /* ======================================
    ASSETS CALCULATION FUNCTIONS 
-   (TETAP SAMA, TIDAK PERLU DIUBAH)
+   (Menggunakan SYNC version)
 ====================================== */
 
-// ... (semua fungsi calculation tetap sama seperti sebelumnya)
-// getTotalPurchaseValue, getTotalCurrentValue, getOverallPL, dll...
-// COPY PASTE dari kode Anda yang lama
-
-/* ======================
-   NORMALIZE CATEGORY FUNCTION (INTERNAL)
-====================== */
-function normalizeCategory(category = "") {
-  const c = category.toLowerCase();
-  if (c.includes("property")) return "property";
-  if (c.includes("vehicle")) return "vehicle";
-  if (c.includes("gold")) return "gold";
-  if (c.includes("land")) return "land";
-  if (c.includes("gadget")) return "gadget";
-  return "other";
-}
-
-/* ======================
-   GET TOTAL PURCHASE VALUE
-====================== */
 export function getTotalPurchaseValue() {
-  const assets = getAssets();
+  const assets = getAssetsSync();
+  if (!Array.isArray(assets)) {
+    console.warn('Assets is not array in getTotalPurchaseValue:', assets);
+    return 0;
+  }
   return assets.reduce((total, asset) => total + (Number(asset.value) || 0), 0);
 }
 
-/* ======================
-   GET TOTAL CURRENT ESTIMATED VALUE
-====================== */
 export function getTotalCurrentValue() {
-  const assets = getAssets();
+  const assets = getAssetsSync();
+  if (!Array.isArray(assets)) {
+    console.warn('Assets is not array in getTotalCurrentValue:', assets);
+    return 0;
+  }
   return assets.reduce((total, asset) => 
     total + (Number(asset.currentEstimatedValue) || Number(asset.value) || 0), 0);
 }
 
-/* ======================
-   GET OVERALL PROFIT/LOSS
-====================== */
 export function getOverallPL() {
   const purchaseTotal = getTotalPurchaseValue();
   const currentTotal = getTotalCurrentValue();
@@ -539,18 +653,16 @@ export function getOverallPL() {
   };
 }
 
-/* ======================
-   GET ASSET COUNT
-====================== */
 export function getAssetCount() {
-  return getAssets().length;
+  const assets = getAssetsSync();
+  return Array.isArray(assets) ? assets.length : 0;
 }
 
-/* ======================
-   GET ASSETS WITH P/L CALCULATED
-====================== */
 export function getAssetsWithPL() {
-  return getAssets().map(asset => {
+  const assets = getAssetsSync();
+  if (!Array.isArray(assets)) return [];
+  
+  return assets.map(asset => {
     const purchasePrice = Number(asset.value) || 0;
     const currentValue = Number(asset.currentEstimatedValue) || purchasePrice;
     const plAmount = currentValue - purchasePrice;
@@ -565,11 +677,10 @@ export function getAssetsWithPL() {
   });
 }
 
-/* ======================
-   GET ASSETS BY CATEGORY WITH VALUE
-====================== */
 export function getAssetsByCategory() {
-  const assets = getAssets();
+  const assets = getAssetsSync();
+  if (!Array.isArray(assets)) return [];
+  
   const categoryMap = {};
   
   assets.forEach(asset => {
@@ -598,4 +709,185 @@ export function getAssetsByCategory() {
       : 0,
     isProfit: (data.totalCurrent - data.totalPurchase) >= 0
   }));
+}
+
+/* ======================================
+   SYNC UTILITIES
+====================================== */
+
+export async function syncAllToCloud() {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: 'Silakan login dulu' }
+  }
+
+  const results = []
+  
+  const syncJobs = [
+    { key: ACCOUNTS_KEY, table: ACCOUNTS_TABLE, name: 'Akun' },
+    { key: ASSETS_KEY, table: ASSETS_TABLE, name: 'Aset' },
+    { key: INVESTMENTS_KEY, table: INVESTMENTS_TABLE, name: 'Investasi' },
+    { key: CREATORS_KEY, table: CREATORS_TABLE, name: 'Kreator' },
+    { key: GOALS_KEY, table: GOALS_TABLE, name: 'Goals' },
+    { key: TRANSACTIONS_KEY, table: TRANSACTIONS_TABLE, name: 'Transaksi' }
+  ]
+
+  for (const job of syncJobs) {
+    try {
+      const data = getLocalData(job.key)
+      const unsyncedData = data.filter(item => !item.synced)
+      
+      if (unsyncedData.length > 0) {
+        const result = await syncService.syncToSupabase(job.table, unsyncedData, {
+          markAsSynced: true
+        })
+        
+        results.push({
+          type: job.name,
+          success: result.success,
+          count: unsyncedData.length,
+          error: result.error
+        })
+        
+        // Update localStorage dengan status synced
+        if (result.success) {
+          const allData = getLocalData(job.key)
+          allData.forEach(item => {
+            if (unsyncedData.find(unsynced => unsynced.id === item.id)) {
+              item.synced = true
+              item.synced_at = new Date().toISOString()
+            }
+          })
+          saveLocalData(job.key, allData)
+        }
+      } else {
+        results.push({
+          type: job.name,
+          success: true,
+          count: 0,
+          message: 'Sudah up-to-date'
+        })
+      }
+    } catch (error) {
+      results.push({
+        type: job.name,
+        success: false,
+        error: error.message
+      })
+    }
+  }
+
+  return results
+}
+
+export async function loadAllFromCloud() {
+  const user = await getCurrentUser()
+  if (!user) {
+    return { success: false, message: 'Silakan login dulu' }
+  }
+
+  try {
+    const [accounts, assets, investments, creators, goals, transactions] = await Promise.all([
+      syncService.loadFromSupabase(ACCOUNTS_TABLE),
+      syncService.loadFromSupabase(ASSETS_TABLE),
+      syncService.loadFromSupabase(INVESTMENTS_TABLE),
+      syncService.loadFromSupabase(CREATORS_TABLE),
+      syncService.loadFromSupabase(GOALS_TABLE),
+      syncService.loadFromSupabase(TRANSACTIONS_TABLE)
+    ])
+
+    saveLocalData(ACCOUNTS_KEY, accounts)
+    saveLocalData(ASSETS_KEY, assets)
+    saveLocalData(INVESTMENTS_KEY, investments)
+    saveLocalData(CREATORS_KEY, creators)
+    saveLocalData(GOALS_KEY, goals)
+    saveLocalData(TRANSACTIONS_KEY, transactions)
+
+    window.dispatchEvent(new Event("accountsUpdated"))
+    window.dispatchEvent(new Event("assetsUpdated"))
+    window.dispatchEvent(new Event("investmentsUpdated"))
+    window.dispatchEvent(new Event("creatorsUpdated"))
+    window.dispatchEvent(new Event("goalsUpdated"))
+    window.dispatchEvent(new Event("transactionsUpdated"))
+
+    return {
+      success: true,
+      counts: {
+        accounts: accounts.length,
+        assets: assets.length,
+        investments: investments.length,
+        creators: creators.length,
+        goals: goals.length,
+        transactions: transactions.length
+      }
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    }
+  }
+}
+
+export async function getSyncStatus() {
+  const user = await getCurrentUser()
+  const online = navigator.onLine
+  
+  const data = {
+    accounts: getLocalData(ACCOUNTS_KEY),
+    assets: getLocalData(ASSETS_KEY),
+    investments: getLocalData(INVESTMENTS_KEY),
+    creators: getLocalData(CREATORS_KEY),
+    goals: getLocalData(GOALS_KEY),
+    transactions: getLocalData(TRANSACTIONS_KEY)
+  }
+  
+  return {
+    user: user ? 'Logged in' : 'Not logged in',
+    online,
+    totals: {
+      accounts: data.accounts.length,
+      assets: data.assets.length,
+      investments: data.investments.length,
+      creators: data.creators.length,
+      goals: data.goals.length,
+      transactions: data.transactions.length
+    },
+    unsynced: {
+      accounts: data.accounts.filter(d => !d.synced).length,
+      assets: data.assets.filter(d => !d.synced).length,
+      investments: data.investments.filter(d => !d.synced).length,
+      creators: data.creators.filter(d => !d.synced).length,
+      goals: data.goals.filter(d => !d.synced).length,
+      transactions: data.transactions.filter(d => !d.synced).length
+    }
+  }
+}
+
+/* ======================================
+   TRIGGER EVENTS
+====================================== */
+
+export function triggerAssetUpdate() {
+  window.dispatchEvent(new Event("assetsUpdated"))
+}
+
+export function triggerAccountUpdate() {
+  window.dispatchEvent(new Event("accountsUpdated"))
+}
+
+export function triggerInvestmentUpdate() {
+  window.dispatchEvent(new Event("investmentsUpdated"))
+}
+
+export function triggerCreatorUpdate() {
+  window.dispatchEvent(new Event("creatorsUpdated"))
+}
+
+export function triggerGoalUpdate() {
+  window.dispatchEvent(new Event("goalsUpdated"))
+}
+
+export function triggerTransactionUpdate() {
+  window.dispatchEvent(new Event("transactionsUpdated"))
 }

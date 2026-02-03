@@ -1,15 +1,123 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co'
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key'
+// ============================================
+// 1. GET ENVIRONMENT VARIABLES
+// ============================================
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
-
-// Helper untuk auth
-export const getCurrentUser = async () => {
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
+// ============================================
+// 2. VALIDASI ENVIRONMENT VARIABLES
+// ============================================
+if (!supabaseUrl) {
+  console.error('❌ ERROR: VITE_SUPABASE_URL is not defined in .env.local')
+  console.error('Please add: VITE_SUPABASE_URL=https://your-project.supabase.co')
 }
 
-// Helper untuk cek online
-export const isOnline = () => navigator.onLine
+if (!supabaseAnonKey) {
+  console.error('❌ ERROR: VITE_SUPABASE_ANON_KEY is not defined in .env.local')
+  console.error('Get it from: Supabase Dashboard → Settings → API → anon public key')
+}
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('📝 Current values:')
+  console.error('- VITE_SUPABASE_URL:', supabaseUrl || '(empty)')
+  console.error('- VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '***set***' : '(empty)')
+}
+
+// ============================================
+// 3. CREATE SUPABASE CLIENT
+// ============================================
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// ============================================
+// 4. HELPER FUNCTION: GET CURRENT USER
+// ============================================
+export async function getCurrentUser() {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser()
+    
+    if (error) {
+      console.warn('⚠️ Auth error:', error.message)
+      return null
+    }
+    
+    return user
+  } catch (error) {
+    console.error('❌ Error getting user:', error)
+    return null
+  }
+}
+
+// ============================================
+// 5. HELPER FUNCTION: CHECK IF ONLINE
+// ============================================
+export function isOnline() {
+  return navigator.onLine
+}
+
+// ============================================
+// 6. AUTH STATE LISTENER
+// ============================================
+
+supabase.auth.onAuthStateChange(async (event, session) => {
+  console.log('🔐 Auth event:', event);
+  
+  // Dispatch custom event untuk React App
+  window.dispatchEvent(new CustomEvent('supabase:auth', { 
+    detail: { event, session, user: session?.user } 
+  }));
+  
+  if (event === 'SIGNED_IN' && session) {
+    console.log('✅ User logged in:', session.user.email);
+    
+    // Auto sync setelah 2 detik
+    setTimeout(async () => {
+      try {
+        const storage = await import('/src/services/storage.js');
+        const status = await storage.getSyncStatus();
+        
+        if (status.unsynced.accounts > 0 || status.unsynced.assets > 0) {
+          console.log('🔄 Auto syncing data...');
+          const results = await storage.syncAllToCloud();
+          console.log('Auto sync results:', results);
+        }
+      } catch (error) {
+        console.error('Auto sync error:', error);
+      }
+    }, 2000);
+  }
+  
+  if (event === 'SIGNED_OUT') {
+    console.log('👋 User signed out');
+  }
+});
+
+// ============================================
+// 7. TEST CONNECTION (Hanya di development)
+// ============================================
+if (import.meta.env.DEV) {
+  setTimeout(async () => {
+    console.log('🔍 Testing Supabase connection...')
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error('❌ Skipping test: Environment variables missing')
+      return
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('count')
+        .limit(1)
+      
+      if (error) {
+        console.error('❌ Database test failed:', error.message)
+      } else {
+        console.log('✅ Supabase connection successful!')
+      }
+    } catch (error) {
+      console.error('❌ Connection test crashed:', error)
+    }
+  }, 3000)
+}

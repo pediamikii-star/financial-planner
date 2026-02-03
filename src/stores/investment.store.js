@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+// Import sync functions dari store.js
+import { 
+  getInvestments as getInvestmentsFromSync,
+  saveInvestment as saveInvestmentToSync,
+  deleteInvestment as deleteInvestmentFromSync
+} from '../services/storage.js';
+
 // Helper untuk delay
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -10,20 +17,92 @@ export const useInvestmentStore = create(
       investments: [],
       isUpdatingPrices: false,
       lastUpdateError: null,
-      updateTimeout: null, // Untuk tracking timeout
+      updateTimeout: null,
+      isSyncing: false,
+      lastSyncError: null,
+
+      // Helper untuk normalize investment data
+      normalizeInvestmentData: (investment) => {
+        const base = {
+          ...investment,
+          // Pastikan semua numeric fields jadi number
+          buyPrice: Number(investment.buyPrice) || 0,
+          quantity: Number(investment.quantity) || 0,
+          currentPrice: Number(investment.currentPrice) || null,
+          currentValue: Number(investment.currentValue) || 0,
+          amount: Number(investment.amount) || 0,
+          interest: Number(investment.interest) || 0,
+          // Sync metadata
+          synced: investment.synced || false,
+          synced_at: investment.synced_at || null
+        };
+        
+        return base;
+      },
+
+      // Helper untuk sync investment ke cloud
+      syncInvestmentToCloud: async (investment, operation = 'save') => {
+        try {
+          const normalizedInvestment = get().normalizeInvestmentData(investment);
+          
+          if (operation === 'save') {
+            await saveInvestmentToSync(normalizedInvestment);
+            return { success: true, investmentId: investment.id };
+          } else if (operation === 'delete') {
+            await deleteInvestmentFromSync(investment.id);
+            return { success: true, investmentId: investment.id };
+          }
+        } catch (error) {
+          console.warn('⚠️ Investment sync to cloud failed:', error.message);
+          return { success: false, error: error.message };
+        }
+      },
+
+      // Load investments dari cloud
+      loadInvestmentsFromCloud: async () => {
+        try {
+          set({ isSyncing: true, lastSyncError: null });
+          
+          const cloudInvestments = await getInvestmentsFromSync();
+          if (cloudInvestments && cloudInvestments.length > 0) {
+            const normalizedInvestments = cloudInvestments.map(inv => 
+              get().normalizeInvestmentData(inv)
+            );
+            
+            set({ 
+              investments: normalizedInvestments,
+              isSyncing: false 
+            });
+            
+            console.log('📥 Loaded investments from cloud:', cloudInvestments.length);
+            return { success: true, count: cloudInvestments.length };
+          }
+          
+          set({ isSyncing: false });
+          return { success: false, error: 'No investments in cloud' };
+          
+        } catch (error) {
+          set({ isSyncing: false, lastSyncError: error.message });
+          console.warn('⚠️ Failed to load investments from cloud:', error);
+          return { success: false, error: error.message };
+        }
+      },
 
       /* =========================
-         ADD INVESTMENT
+         ADD INVESTMENT DENGAN SYNC
       ========================= */
-      addInvestment: (investment) => {
+      addInvestment: async (investment) => {
         const base = {
           id: crypto.randomUUID(),
           type: investment.type,
-          createdAt: Date.now(),
+          createdAt: new Date().toISOString(),
           lastUpdated: null,
           currentPrice: null,
           currentValue: null,
-          priceStatus: 'pending'
+          priceStatus: 'pending',
+          // Sync metadata
+          synced: false,
+          synced_at: null
         };
 
         let newInvestment = base;
@@ -90,10 +169,14 @@ export const useInvestmentStore = create(
           };
         }
 
+        // Update local state
         set((state) => ({
           investments: [...state.investments, newInvestment],
           lastUpdateError: null
         }));
+
+        // Sync ke cloud (background)
+        get().syncInvestmentToCloud(newInvestment, 'save');
 
         // Schedule price update for crypto/stock
         if (investment.type === "crypto" || investment.type === "stock") {
@@ -106,12 +189,14 @@ export const useInvestmentStore = create(
           
           set({ updateTimeout: timeoutId });
         }
+
+        return newInvestment;
       },
 
       /* =========================
-         UPDATE INVESTMENT
+         UPDATE INVESTMENT DENGAN SYNC
       ========================= */
-      updateInvestment: (updated) => {
+      updateInvestment: async (updated) => {
         set((state) => ({
           investments: state.investments.map((inv) => {
             if (inv.id !== updated.id) return inv;
@@ -119,7 +204,9 @@ export const useInvestmentStore = create(
             const base = {
               ...inv,
               type: updated.type,
-              lastUpdated: new Date().toISOString()
+              lastUpdated: new Date().toISOString(),
+              // Mark for sync
+              synced: false
             };
 
             // CRYPTO
@@ -193,6 +280,12 @@ export const useInvestmentStore = create(
           lastUpdateError: null
         }));
 
+        // Find updated investment and sync
+        const updatedInvestment = get().investments.find(inv => inv.id === updated.id);
+        if (updatedInvestment) {
+          get().syncInvestmentToCloud(updatedInvestment, 'save');
+        }
+
         // Schedule update for crypto/stock
         if (updated.type === "crypto" || updated.type === "stock") {
           const { updateTimeout } = get();
@@ -207,19 +300,17 @@ export const useInvestmentStore = create(
       },
 
       /* =========================
-         UPDATE PRICES BATCH (FIXED VERSION)
+         UPDATE PRICES BATCH
       ========================= */
       updatePrices: async () => {
         const state = get();
         const { investments, isUpdatingPrices } = state;
         
-        // Prevent concurrent updates
         if (isUpdatingPrices) {
           console.log('⚠️ Price update already in progress');
           return investments;
         }
         
-        // Filter only investments that need price updates
         const needsUpdate = investments.filter(
           inv => (inv.type === 'crypto' || inv.type === 'stock') && inv.priceStatus !== 'static'
         );
@@ -234,14 +325,12 @@ export const useInvestmentStore = create(
         try {
           set({ isUpdatingPrices: true, lastUpdateError: null });
           
-          // Import price service
           const priceService = await import('../services/priceService');
           
           if (!priceService || !priceService.updateAllInvestmentPrices) {
             throw new Error('Price service not available');
           }
           
-          // Call the price service
           const updatedInvestments = await priceService.updateAllInvestmentPrices(investments);
           
           // Update state
@@ -250,7 +339,13 @@ export const useInvestmentStore = create(
             isUpdatingPrices: false 
           });
           
-          // Log results
+          // Sync updated investments to cloud
+          updatedInvestments
+            .filter(inv => inv.priceStatus === 'updated')
+            .forEach(inv => {
+              get().syncInvestmentToCloud(inv, 'save');
+            });
+          
           const updatedCount = updatedInvestments.filter(
             inv => inv.priceStatus === 'updated'
           ).length;
@@ -265,13 +360,13 @@ export const useInvestmentStore = create(
         } catch (error) {
           console.error('❌ Error updating prices:', error);
           
-          // Update status to failed for pending investments
           const updatedInvestments = investments.map((inv) => {
             if ((inv.type === 'crypto' || inv.type === 'stock') && inv.priceStatus === 'pending') {
               return {
                 ...inv,
                 priceStatus: 'failed',
-                lastUpdated: new Date().toISOString()
+                lastUpdated: new Date().toISOString(),
+                synced: false
               };
             }
             return inv;
@@ -297,14 +392,21 @@ export const useInvestmentStore = create(
           investments: state.investments.map((inv) => {
             if (inv.id === investmentId && (inv.type === 'stock' || inv.type === 'crypto')) {
               const currentValue = newPrice * (inv.quantity || 1);
-              
-              return {
+              const updatedInvestment = {
                 ...inv,
                 currentPrice: newPrice,
                 currentValue: currentValue,
                 lastUpdated: new Date().toISOString(),
-                priceStatus: 'updated'
+                priceStatus: 'updated',
+                synced: false
               };
+              
+              // Sync ke cloud
+              setTimeout(() => {
+                get().syncInvestmentToCloud(updatedInvestment, 'save');
+              }, 0);
+              
+              return updatedInvestment;
             }
             return inv;
           }),
@@ -313,7 +415,7 @@ export const useInvestmentStore = create(
       },
 
       /* =========================
-         MANUAL REFRESH PRICE (FIXED VERSION)
+         MANUAL REFRESH PRICE
       ========================= */
       refreshPrice: async (investmentId) => {
         const state = get();
@@ -332,7 +434,8 @@ export const useInvestmentStore = create(
               return {
                 ...inv,
                 priceStatus: 'pending',
-                lastUpdated: new Date().toISOString()
+                lastUpdated: new Date().toISOString(),
+                synced: false
               };
             }
             return inv;
@@ -340,7 +443,6 @@ export const useInvestmentStore = create(
         }));
         
         try {
-          // Import price service
           const priceService = await import('../services/priceService');
           
           if (!priceService) {
@@ -355,13 +457,11 @@ export const useInvestmentStore = create(
           }
           
           if (newPrice) {
-            // Use the existing updateSinglePrice method
             get().updateSinglePrice(investmentId, newPrice);
             console.log(`✅ Refreshed ${investment.symbol}: Rp ${newPrice.toLocaleString()}`);
           } else {
             console.warn(`❌ Failed to refresh ${investment.symbol}`);
             
-            // Mark as failed
             set((state) => ({
               investments: state.investments.map((inv) => {
                 if (inv.id === investmentId) {
@@ -395,16 +495,24 @@ export const useInvestmentStore = create(
       },
 
       /* =========================
-         REMOVE INVESTMENT
+         REMOVE INVESTMENT DENGAN SYNC
       ========================= */
-      removeInvestment: (id) => {
+      removeInvestment: async (id) => {
+        const investmentToDelete = get().investments.find(inv => inv.id === id);
+        
+        if (!investmentToDelete) return;
+        
         const { updateTimeout } = get();
         if (updateTimeout) clearTimeout(updateTimeout);
         
+        // Update local state
         set((state) => ({
           investments: state.investments.filter((inv) => inv.id !== id),
           updateTimeout: null
         }));
+        
+        // Sync delete ke cloud
+        get().syncInvestmentToCloud(investmentToDelete, 'delete');
       },
 
       /* =========================
@@ -433,6 +541,7 @@ export const useInvestmentStore = create(
         let updatedCount = 0;
         let failedCount = 0;
         let pendingCount = 0;
+        let syncedCount = 0;
         
         investments.forEach(inv => {
           const currentValue = inv.currentValue || 0;
@@ -448,6 +557,9 @@ export const useInvestmentStore = create(
           } else {
             totalBuyValue += inv.amount || 0;
           }
+          
+          // Track sync status
+          if (inv.synced) syncedCount++;
         });
         
         const totalPnL = totalCurrentValue - totalBuyValue;
@@ -464,6 +576,11 @@ export const useInvestmentStore = create(
             failed: failedCount,
             pending: pendingCount,
             static: investments.length - (updatedCount + failedCount + pendingCount)
+          },
+          syncStatus: {
+            synced: syncedCount,
+            unsynced: investments.length - syncedCount,
+            percentage: investments.length > 0 ? Math.round((syncedCount / investments.length) * 100) : 0
           }
         };
       },
@@ -488,7 +605,7 @@ export const useInvestmentStore = create(
       },
 
       /* =========================
-         FORCE PRICE UPDATE (FIXED VERSION)
+         FORCE PRICE UPDATE
       ========================= */
       forceUpdatePrices: async () => {
         const state = get();
@@ -501,13 +618,13 @@ export const useInvestmentStore = create(
         
         console.log('🔁 Forcing price update (ignoring cache)...');
         
-        // Mark all crypto/stocks as pending
         set((state) => ({
           investments: state.investments.map((inv) => {
             if (inv.type === 'crypto' || inv.type === 'stock') {
               return {
                 ...inv,
-                priceStatus: 'pending'
+                priceStatus: 'pending',
+                synced: false
               };
             }
             return inv;
@@ -515,10 +632,8 @@ export const useInvestmentStore = create(
           lastUpdateError: null
         }));
         
-        // Wait a bit for state to update
         await delay(100);
         
-        // Trigger update
         return get().updatePrices();
       },
 
@@ -526,11 +641,17 @@ export const useInvestmentStore = create(
          GET UPDATE STATUS
       ========================= */
       getUpdateStatus: () => {
-        const { isUpdatingPrices, lastUpdateError } = get();
+        const { isUpdatingPrices, lastUpdateError, isSyncing, lastSyncError } = get();
         return {
-          isUpdating: isUpdatingPrices,
-          error: lastUpdateError,
-          timestamp: new Date().toISOString()
+          priceUpdate: {
+            isUpdating: isUpdatingPrices,
+            error: lastUpdateError,
+            timestamp: new Date().toISOString()
+          },
+          syncStatus: {
+            isSyncing,
+            error: lastSyncError
+          }
         };
       },
 
@@ -540,13 +661,13 @@ export const useInvestmentStore = create(
       retryFailedUpdates: () => {
         const { investments } = get();
         
-        // Mark failed as pending for retry
         set((state) => ({
           investments: state.investments.map((inv) => {
             if ((inv.type === 'crypto' || inv.type === 'stock') && inv.priceStatus === 'failed') {
               return {
                 ...inv,
-                priceStatus: 'pending'
+                priceStatus: 'pending',
+                synced: false
               };
             }
             return inv;
@@ -554,14 +675,13 @@ export const useInvestmentStore = create(
           lastUpdateError: null
         }));
         
-        // Trigger update after a short delay
         setTimeout(() => {
           get().updatePrices();
         }, 500);
       },
 
       /* =========================
-         DIRECT PRICE TEST (NEW)
+         DIRECT PRICE TEST
       ========================= */
       testPriceService: async () => {
         console.log('🧪 Testing price service directly...');
@@ -569,15 +689,12 @@ export const useInvestmentStore = create(
         try {
           const priceService = await import('../services/priceService');
           
-          // Test BBCA
           const bcaPrice = await priceService.fetchStockPrice('BBCA');
           console.log('BBCA Price:', bcaPrice);
           
-          // Test TLKM
           const tlkmPrice = await priceService.fetchStockPrice('TLKM');
           console.log('TLKM Price:', tlkmPrice);
           
-          // Test UNVR
           const unvrPrice = await priceService.fetchStockPrice('UNVR');
           console.log('UNVR Price:', unvrPrice);
           
@@ -586,14 +703,124 @@ export const useInvestmentStore = create(
           console.error('❌ Price service test failed:', error);
           return null;
         }
+      },
+
+      /* =========================
+         NEW: SYNC UTILITY METHODS
+      ========================= */
+
+      // Manual sync untuk investment tertentu
+      syncInvestment: async (investmentId) => {
+        const investment = get().investments.find(inv => inv.id === investmentId);
+        if (!investment) return { success: false, error: 'Investment not found' };
+        
+        const result = await get().syncInvestmentToCloud(investment, 'save');
+        
+        if (result.success) {
+          set((state) => ({
+            investments: state.investments.map((inv) =>
+              inv.id === investmentId 
+                ? { ...inv, synced: true, synced_at: new Date().toISOString() }
+                : inv
+            )
+          }));
+        }
+        
+        return result;
+      },
+
+      // Sync semua investments ke cloud
+      syncAllInvestments: async () => {
+        const { investments } = get();
+        const results = [];
+        
+        set({ isSyncing: true, lastSyncError: null });
+        
+        for (const investment of investments) {
+          if (!investment.synced) {
+            const result = await get().syncInvestmentToCloud(investment, 'save');
+            if (result.success) {
+              results.push({ investmentId: investment.id, success: true });
+              
+              // Update sync status
+              set((state) => ({
+                investments: state.investments.map((inv) =>
+                  inv.id === investment.id 
+                    ? { ...inv, synced: true, synced_at: new Date().toISOString() }
+                    : inv
+                )
+              }));
+            } else {
+              results.push({ investmentId: investment.id, success: false, error: result.error });
+            }
+          } else {
+            results.push({ investmentId: investment.id, success: true, message: 'Already synced' });
+          }
+        }
+        
+        set({ isSyncing: false });
+        return results;
+      },
+
+      // Get sync status untuk investments
+      getSyncStatus: () => {
+        const { investments } = get();
+        const total = investments.length;
+        const synced = investments.filter(inv => inv.synced).length;
+        const unsynced = total - synced;
+        
+        return {
+          total,
+          synced,
+          unsynced,
+          percentage: total > 0 ? Math.round((synced / total) * 100) : 0
+        };
+      },
+
+      // Retry failed syncs
+      retryFailedSyncs: async () => {
+        const { investments } = get();
+        const unsyncedInvestments = investments.filter(inv => !inv.synced);
+        const results = [];
+        
+        set({ isSyncing: true });
+        
+        for (const investment of unsyncedInvestments) {
+          const result = await get().syncInvestmentToCloud(investment, 'save');
+          if (result.success) {
+            set((state) => ({
+              investments: state.investments.map((inv) =>
+                inv.id === investment.id 
+                  ? { ...inv, synced: true, synced_at: new Date().toISOString() }
+                  : inv
+              )
+            }));
+            results.push({ investmentId: investment.id, success: true });
+          } else {
+            results.push({ investmentId: investment.id, success: false, error: result.error });
+          }
+        }
+        
+        set({ isSyncing: false });
+        return results;
+      },
+
+      // Refresh investments dari cloud
+      refreshInvestments: async () => {
+        return await get().loadInvestmentsFromCloud();
+      },
+
+      // Initialize investments dari cloud
+      initializeFromCloud: async () => {
+        console.log('🔄 Initializing investments from cloud...');
+        return await get().loadInvestmentsFromCloud();
       }
     }),
     {
       name: "investment-storage",
-      version: 2, // Increment version
+      version: 3, // Increment version untuk sync changes
       partialize: (state) => ({
         investments: state.investments,
-        // Don't persist loading/error states
       })
     }
   )
@@ -618,3 +845,31 @@ export function getInvestmentById(id) {
   const store = useInvestmentStore.getState();
   return store.investments.find(inv => inv.id === id);
 }
+
+// =================== ADDITIONAL EXPORTS ===================
+
+// Export individual sync functions
+export const syncInvestmentToCloud = async (investment) => {
+  const store = useInvestmentStore.getState();
+  return store.syncInvestmentToCloud(investment, 'save');
+};
+
+export const syncAllInvestments = async () => {
+  const store = useInvestmentStore.getState();
+  return store.syncAllInvestments();
+};
+
+export const getInvestmentsSyncStatus = () => {
+  const store = useInvestmentStore.getState();
+  return store.getSyncStatus();
+};
+
+export const refreshInvestmentsFromCloud = async () => {
+  const store = useInvestmentStore.getState();
+  return store.refreshInvestments();
+};
+
+export const initializeInvestmentsFromCloud = async () => {
+  const store = useInvestmentStore.getState();
+  return store.initializeFromCloud();
+};

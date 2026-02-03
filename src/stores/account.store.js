@@ -1,5 +1,15 @@
 // src/store/account.store.js
 
+// ============================================
+// IMPORT SYNC FUNCTIONS DARI store.js
+// ============================================
+import { 
+  getAccounts as getAccountsFromSync,
+  saveAccount as saveAccountToSync,
+  deleteAccount as deleteAccountFromSync,
+  updateAccount as updateAccountInSync
+} from '../services/storage.js';
+
 const STORAGE_KEY = "accounts";
 
 /* =========================
@@ -57,17 +67,49 @@ function saveToStorage() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
 }
 
-function loadFromStorage() {
+async function loadFromStorage() {
   try {
+    // Coba load dari sync system dulu
+    const syncedAccounts = await getAccountsFromSync();
+    
+    if (syncedAccounts && syncedAccounts.length > 0) {
+      console.log('📥 Loaded accounts from sync system:', syncedAccounts.length);
+      accounts = syncedAccounts;
+    } else {
+      // Fallback ke local storage
+      const raw = localStorage.getItem(STORAGE_KEY);
+      accounts = raw ? JSON.parse(raw) : [];
+      console.log('📥 Loaded accounts from localStorage:', accounts.length);
+    }
+  } catch (error) {
+    console.warn('⚠️ Error loading accounts from sync, using localStorage:', error);
     const raw = localStorage.getItem(STORAGE_KEY);
     accounts = raw ? JSON.parse(raw) : [];
-  } catch {
-    accounts = [];
+  }
+}
+
+// Helper untuk sync perubahan ke cloud
+async function syncAccountChange(account, operation = 'save') {
+  try {
+    if (operation === 'save') {
+      await saveAccountToSync(account);
+    } else if (operation === 'delete') {
+      await deleteAccountFromSync(account.id);
+    } else if (operation === 'update') {
+      await updateAccountInSync(account);
+    }
+  } catch (error) {
+    console.warn('⚠️ Sync to cloud failed (will retry later):', error.message);
+    // Mark as unsynced for later retry
+    if (account) {
+      account.synced = false;
+      saveToStorage();
+    }
   }
 }
 
 /* =========================
-   PUBLIC STORE API
+   PUBLIC STORE API - DENGAN SYNC SUPPORT
 ========================= */
 export const accountStore = {
   /* ---------- subscribe ---------- */
@@ -82,6 +124,12 @@ export const accountStore = {
 
   /* ---------- getters ---------- */
   getAll() {
+    return accounts;
+  },
+
+  async getAllAsync() {
+    // Untuk komponen yang perlu async data
+    await this.refreshFromSync();
     return accounts;
   },
 
@@ -125,46 +173,62 @@ export const accountStore = {
     return accounts.reduce((total, acc) => total + (Number(acc.balance) || 0), 0);
   },
 
-  /* ---------- NEW: Get accounts with debit card ---------- */
+  /* ---------- Get accounts with debit card ---------- */
   getAccountsWithDebitCard() {
     return accounts.filter(acc => 
       acc.debitCardNumber && acc.debitCardProvider
     );
   },
 
-  /* ---------- NEW: Format card number for display ---------- */
+  /* ---------- Format card number for display ---------- */
   formatCardNumber(cardNumber) {
     return formatCardNumberForDisplay(cardNumber);
   },
 
-  /* ---------- NEW: Mask card number (•••• 1234 5678 9012) ---------- */
+  /* ---------- Mask card number (•••• 1234 5678 9012) ---------- */
   maskCardNumber(cardNumber) {
     return maskCardNumber(cardNumber);
   },
 
-  /* ---------- NEW: Get last 4 digits ---------- */
+  /* ---------- Get last 4 digits ---------- */
   getLastFourDigits(cardNumber) {
     if (!cardNumber) return null;
     const clean = cardNumber.replace(/\D/g, '');
     return clean.slice(-4);
   },
 
-  /* ---------- NEW: Get provider logo key ---------- */
+  /* ---------- Get provider logo key ---------- */
   getDebitProviderLogoKey(providerName) {
     if (!providerName) return null;
     return providerName.toLowerCase().replace(/\s+/g, '');
   },
 
   /* ---------- actions ---------- */
-  init() {
-    loadFromStorage();
+  async init() {
+    await loadFromStorage();
     notify();
   },
 
-  add(account) {
+  /* ---------- Refresh data dari cloud ---------- */
+  async refreshFromSync() {
+    try {
+      const syncedAccounts = await getAccountsFromSync();
+      if (syncedAccounts && syncedAccounts.length > 0) {
+        accounts = syncedAccounts;
+        saveToStorage();
+        notify();
+        console.log('🔄 Refreshed accounts from cloud:', accounts.length);
+      }
+    } catch (error) {
+      console.warn('⚠️ Refresh from cloud failed:', error.message);
+    }
+  },
+
+  /* ---------- Add account dengan sync ---------- */
+  async add(account) {
     const newAccount = {
       // Default values
-      id: account.id ?? Date.now(),
+      id: account.id ?? crypto.randomUUID(),
       type: account.type || "unknown",
       name: account.name || "Unnamed Account",
       detail: account.detail || "",
@@ -185,15 +249,24 @@ export const accountStore = {
       
       // Cash specific (jika ada)
       ...(account.cashType && { cashType: account.cashType }),
+      
+      // Sync metadata
+      synced: false,
+      synced_at: null
     };
     
     accounts.push(newAccount);
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    syncAccountChange(newAccount, 'save');
+    
     return newAccount;
   },
 
-  update(updated) {
+  /* ---------- Update account dengan sync ---------- */
+  async update(updated) {
     accounts = accounts.map((acc) =>
       acc.id === updated.id 
         ? { 
@@ -203,36 +276,61 @@ export const accountStore = {
             ...(updated.balance !== undefined && { balance: Number(updated.balance) }),
             // Update timestamp
             updatedAt: new Date().toISOString(),
+            // Mark for sync
+            synced: false
           } 
         : acc
     );
+    
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    const updatedAccount = accounts.find(acc => acc.id === updated.id);
+    if (updatedAccount) {
+      syncAccountChange(updatedAccount, 'update');
+    }
   },
 
-  remove(id) {
+  /* ---------- Remove account dengan sync ---------- */
+  async remove(id) {
+    const accountToDelete = accounts.find(acc => acc.id === id);
+    
+    if (!accountToDelete) return;
+    
     accounts = accounts.filter((acc) => acc.id !== id);
     saveToStorage();
     notify();
+    
+    // Sync delete ke cloud (background)
+    syncAccountChange(accountToDelete, 'delete');
   },
 
-  adjustBalance(accountId, delta) {
+  /* ---------- Adjust balance dengan sync ---------- */
+  async adjustBalance(accountId, delta) {
     accounts = accounts.map((acc) =>
       acc.id === accountId
         ? {
             ...acc,
             balance: Number(acc.balance || 0) + Number(delta || 0),
             updatedAt: new Date().toISOString(),
+            synced: false
           }
         : acc
     );
 
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    const updatedAccount = accounts.find(acc => acc.id === accountId);
+    if (updatedAccount) {
+      syncAccountChange(updatedAccount, 'update');
+    }
   },
 
-  /* ---------- ADD BALANCE METHOD ---------- */
-  addBalance(accountId, amount, description = "Deposit") {
+  /* ---------- ADD BALANCE METHOD dengan sync ---------- */
+  async addBalance(accountId, amount, description = "Deposit") {
     const account = accounts.find(acc => acc.id === accountId);
     
     if (!account) {
@@ -260,11 +358,15 @@ export const accountStore = {
     };
     
     account.lastTransaction = transaction;
-    account.transactionHistory = [transaction, ...(account.transactionHistory || [])].slice(0, 10); // Keep last 10
+    account.transactionHistory = [transaction, ...(account.transactionHistory || [])].slice(0, 10);
     account.updatedAt = new Date().toISOString();
+    account.synced = false;
     
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    syncAccountChange(account, 'update');
     
     return {
       success: true,
@@ -275,8 +377,8 @@ export const accountStore = {
     };
   },
 
-  /* ---------- DEDUCT BALANCE METHOD ---------- */
-  deductBalance(accountId, amount, description = "Withdrawal") {
+  /* ---------- DEDUCT BALANCE METHOD dengan sync ---------- */
+  async deductBalance(accountId, amount, description = "Withdrawal") {
     const account = accounts.find(acc => acc.id === accountId);
     
     if (!account) {
@@ -303,7 +405,7 @@ export const accountStore = {
     const transaction = {
       id: Date.now(),
       type: "withdrawal",
-      amount: -deductAmount, // Negative for withdrawal
+      amount: -deductAmount,
       description,
       timestamp: new Date().toISOString(),
       previousBalance: currentBalance,
@@ -313,9 +415,13 @@ export const accountStore = {
     account.lastTransaction = transaction;
     account.transactionHistory = [transaction, ...(account.transactionHistory || [])].slice(0, 10);
     account.updatedAt = new Date().toISOString();
+    account.synced = false;
     
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    syncAccountChange(account, 'update');
     
     return {
       success: true,
@@ -326,8 +432,8 @@ export const accountStore = {
     };
   },
 
-  /* ---------- TRANSFER BETWEEN ACCOUNTS ---------- */
-  transfer(fromAccountId, toAccountId, amount, description = "Transfer") {
+  /* ---------- TRANSFER BETWEEN ACCOUNTS dengan sync ---------- */
+  async transfer(fromAccountId, toAccountId, amount, description = "Transfer") {
     const fromAccount = accounts.find(acc => acc.id === fromAccountId);
     const toAccount = accounts.find(acc => acc.id === toAccountId);
     
@@ -392,10 +498,16 @@ export const accountStore = {
     toAccount.transactionHistory = [toTransaction, ...(toAccount.transactionHistory || [])].slice(0, 10);
     
     fromAccount.updatedAt = now;
+    fromAccount.synced = false;
     toAccount.updatedAt = now;
+    toAccount.synced = false;
     
     saveToStorage();
     notify();
+    
+    // Sync kedua account ke cloud (background)
+    syncAccountChange(fromAccount, 'update');
+    syncAccountChange(toAccount, 'update');
     
     return {
       success: true,
@@ -411,8 +523,8 @@ export const accountStore = {
     };
   },
 
-  /* ---------- NEW: UPDATE LATEST TRANSACTION (for mock data) ---------- */
-  updateLatestTransaction(accountId, transactionData) {
+  /* ---------- UPDATE LATEST TRANSACTION ---------- */
+  async updateLatestTransaction(accountId, transactionData) {
     const account = accounts.find(acc => acc.id === accountId);
     
     if (!account) {
@@ -427,9 +539,13 @@ export const accountStore = {
     
     account.lastTransaction = transaction;
     account.updatedAt = new Date().toISOString();
+    account.synced = false;
     
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    syncAccountChange(account, 'update');
     
     return {
       success: true,
@@ -438,8 +554,8 @@ export const accountStore = {
     };
   },
 
-  /* ---------- NEW: ADD MOCK TRANSACTION (for testing) ---------- */
-  addMockTransaction(accountId) {
+  /* ---------- ADD MOCK TRANSACTION ---------- */
+  async addMockTransaction(accountId) {
     const account = accounts.find(acc => acc.id === accountId);
     
     if (!account) {
@@ -470,9 +586,13 @@ export const accountStore = {
     account.lastTransaction = transaction;
     account.transactionHistory = [transaction, ...(account.transactionHistory || [])].slice(0, 10);
     account.updatedAt = new Date().toISOString();
+    account.synced = false;
     
     saveToStorage();
     notify();
+    
+    // Sync ke cloud (background)
+    syncAccountChange(account, 'update');
     
     return {
       success: true,
@@ -482,13 +602,13 @@ export const accountStore = {
   },
 
   /* ---------- RESET ALL ---------- */
-  resetAll() {
+  async resetAll() {
     accounts = [];
     saveToStorage();
     notify();
   },
 
-  /* ---------- NEW: GET ACCOUNT CARD DISPLAY INFO ---------- */
+  /* ---------- GET ACCOUNT CARD DISPLAY INFO ---------- */
   getAccountCardInfo(accountId) {
     const account = accounts.find(acc => acc.id === accountId);
     
@@ -512,4 +632,61 @@ export const accountStore = {
         : "No transactions",
     };
   },
+
+  /* ---------- NEW: SYNC SPECIFIC METHODS ---------- */
+  
+  // Manual sync untuk account ini saja
+  async syncToCloud(accountId) {
+    const account = accounts.find(acc => acc.id === accountId);
+    if (!account) return { success: false, error: 'Account not found' };
+    
+    try {
+      await saveAccountToSync(account);
+      account.synced = true;
+      account.synced_at = new Date().toISOString();
+      saveToStorage();
+      notify();
+      return { success: true, accountId };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Cek sync status untuk semua accounts
+  getSyncStatus() {
+    const total = accounts.length;
+    const synced = accounts.filter(acc => acc.synced).length;
+    const unsynced = total - synced;
+    
+    return {
+      total,
+      synced,
+      unsynced,
+      percentage: total > 0 ? Math.round((synced / total) * 100) : 0
+    };
+  },
+
+  // Retry sync untuk yang gagal
+  async retryFailedSyncs() {
+    const unsyncedAccounts = accounts.filter(acc => !acc.synced);
+    const results = [];
+    
+    for (const account of unsyncedAccounts) {
+      try {
+        await saveAccountToSync(account);
+        account.synced = true;
+        account.synced_at = new Date().toISOString();
+        results.push({ accountId: account.id, success: true });
+      } catch (error) {
+        results.push({ accountId: account.id, success: false, error: error.message });
+      }
+    }
+    
+    if (results.length > 0) {
+      saveToStorage();
+      notify();
+    }
+    
+    return results;
+  }
 };

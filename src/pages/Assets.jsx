@@ -5,7 +5,7 @@ import AddAssetModal from "../components/assets/AddAssetModal";
 import AssetCard from "../components/assets/AssetCard";
 import AssetChart from "../components/assets/AssetChart";
 import { 
-  getAssets, 
+  getAssets as getAssetsAsync,
   getTotalPurchaseValue, 
   getTotalCurrentValue, 
   getOverallPL,
@@ -137,26 +137,6 @@ function FilterDropdown({ filterCategory, setFilterCategory, isOpen, setIsOpen, 
   );
 }
 
-function Section({ title, data, onEdit }) {
-  return (
-    <div>
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-cyan-400 rounded-full"></div>
-        <h2 className="text-xl font-bold text-slate-800">{title}</h2>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        {data.map(asset => (
-          <AssetCard
-            key={asset.id}
-            asset={asset}
-            onEdit={() => onEdit(asset)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function SummaryItem({ label, value, color, plData }) {
   return (
     <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/40 transition-colors group">
@@ -177,23 +157,53 @@ function SummaryItem({ label, value, color, plData }) {
   );
 }
 
+function Section({ title, data, onEdit }) {
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-cyan-400 rounded-full"></div>
+        <h2 className="text-xl font-bold text-slate-800">{title}</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {data.map(asset => (
+          <AssetCard
+            key={asset.id}
+            asset={asset}
+            onEdit={() => onEdit(asset)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Assets() {
   const [assets, setAssets] = useState([]);
   const [categoryData, setCategoryData] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editAsset, setEditAsset] = useState(null);
+  const [loading, setLoading] = useState(true);
   
   const [sortBy, setSortBy] = useState("value-high");
   const [filterCategory, setFilterCategory] = useState("all");
   const [sortOpen, setSortOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
 
-  function loadAssets() {
-    const loadedAssets = getAssets();
-    const categories = getAssetsByCategory();
-    
-    setAssets(loadedAssets);
-    setCategoryData(categories);
+  async function loadAssets() {
+    try {
+      setLoading(true);
+      const loadedAssets = await getAssetsAsync();
+      const categories = getAssetsByCategory();
+      
+      setAssets(loadedAssets || []);
+      setCategoryData(categories || []);
+    } catch (error) {
+      console.error('Failed to load assets:', error);
+      setAssets([]);
+      setCategoryData([]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -215,7 +225,7 @@ export default function Assets() {
   const overallPL = getOverallPL();
 
   function sortAssets(assetsList) {
-    const sorted = [...assetsList];
+    const sorted = [...(assetsList || [])];
     
     switch(sortBy) {
       case "value-high":
@@ -244,11 +254,11 @@ export default function Assets() {
         });
       case "date-new":
         return sorted.sort((a, b) => 
-          new Date(b.createdAt || 0) - new Date(a.createdAt || 0)
+          new Date(b.created_at || b.createdAt || 0) - new Date(a.created_at || a.createdAt || 0)
         );
       case "date-old":
         return sorted.sort((a, b) => 
-          new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+          new Date(a.created_at || a.createdAt || 0) - new Date(b.created_at || b.createdAt || 0)
         );
       default:
         return sorted;
@@ -256,6 +266,7 @@ export default function Assets() {
   }
 
   function filterAssets(assetsList) {
+    if (!Array.isArray(assetsList)) return [];
     if (filterCategory === "all") return assetsList;
     return assetsList.filter(asset => 
       normalizeCategory(asset.category) === filterCategory
@@ -310,6 +321,17 @@ export default function Assets() {
       )
     : null;
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading assets...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       {(sortOpen || filterOpen) && (
@@ -349,106 +371,107 @@ export default function Assets() {
 
         {/* ===== DUA CARD UTAMA - UKURAN FIX 480px ===== */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.6fr] gap-5">
-{/* ===== CARD KIRI: TOTAL ASSET VALUE - TANPA SCROLL ===== */}
-<div className="relative bg-gradient-to-br from-blue-50 via-white to-blue-100/30 rounded-2xl p-6 shadow-lg border border-blue-200/50 
-  h-[480px] min-h-[480px] max-h-[480px] overflow-hidden flex flex-col">
-  
-  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-400/10 to-cyan-300/10 rounded-full -translate-y-12 translate-x-12"></div>
-  
-  <div className="relative z-10 flex-1 overflow-hidden flex flex-col">
-    {/* Header */}
-    <div className="flex items-center gap-3 mb-4">
-      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-md">
-        <span className="text-xl text-white">💰</span>
-      </div>
-      <div>
-        <h2 className="text-lg font-bold text-slate-800">Total Asset Value</h2>
-        <p className="text-xs text-slate-500 mt-0.5">Total value of all assets</p>
-      </div>
-    </div>
+          {/* ===== CARD KIRI: TOTAL ASSET VALUE - TANPA SCROLL ===== */}
+          <div className="relative bg-gradient-to-br from-blue-50 via-white to-blue-100/30 rounded-2xl p-6 shadow-lg border border-blue-200/50 
+            h-[480px] min-h-[480px] max-h-[480px] overflow-hidden flex flex-col">
+            
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-400/10 to-cyan-300/10 rounded-full -translate-y-12 translate-x-12"></div>
+            
+            <div className="relative z-10 flex-1 overflow-hidden flex flex-col">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-md">
+                  <span className="text-xl text-white">💰</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Total Asset Value</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Total value of all assets</p>
+                </div>
+              </div>
 
-    {/* Main Content */}
-    <div className="flex-1 flex flex-col">
-      {/* Purchase Value */}
-      <div className="mb-3">
-        <div className="text-sm text-slate-500 mb-1">Total Purchase Value</div>
-        <div className="text-2xl font-bold text-slate-700">
-          Rp {totalPurchaseValue.toLocaleString("id-ID")}
-        </div>
-      </div>
+              {/* Main Content */}
+              <div className="flex-1 flex flex-col">
+                {/* Purchase Value */}
+                <div className="mb-3">
+                  <div className="text-sm text-slate-500 mb-1">Total Purchase Value</div>
+                  <div className="text-2xl font-bold text-slate-700">
+                    Rp {totalPurchaseValue.toLocaleString("id-ID")}
+                  </div>
+                </div>
 
-      {/* Current Estimated Value */}
-      <div className="mb-4">
-        <div className="text-sm text-slate-500 mb-1">Total Current Estimated Value</div>
-        <div className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-          Rp {totalCurrentValue.toLocaleString("id-ID")}
-        </div>
-      </div>
+                {/* Current Estimated Value */}
+                <div className="mb-4">
+                  <div className="text-sm text-slate-500 mb-1">Total Current Estimated Value</div>
+                  <div className="text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
+                    Rp {totalCurrentValue.toLocaleString("id-ID")}
+                  </div>
+                </div>
 
-      {/* Garis Pemisah */}
-      <div className="border-t border-slate-300/50 my-3"></div>
+                {/* Garis Pemisah */}
+                <div className="border-t border-slate-300/50 my-3"></div>
 
-      {/* Total Profit - CENTERED */}
-      <div className="text-center mb-5">
-        <div className="text-sm text-slate-500 mb-1">Total Profit</div>
-        <div className="flex items-center justify-center gap-2">
-          <span className={`text-xl font-bold ${overallPL.isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {overallPL.isProfit ? '+' : ''}Rp {Math.abs(overallPL.amount).toLocaleString("id-ID")}
-          </span>
-          <span className={`text-sm font-medium ${overallPL.isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
-            ({overallPL.isProfit ? '+' : ''}{overallPL.percentage.toFixed(1)}%)
-          </span>
-        </div>
-      </div>
+                {/* Total Profit - CENTERED */}
+                <div className="text-center mb-5">
+                  <div className="text-sm text-slate-500 mb-1">Total Profit</div>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className={`text-xl font-bold ${overallPL.isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {overallPL.isProfit ? '+' : ''}Rp {Math.abs(overallPL.amount).toLocaleString("id-ID")}
+                    </span>
+                    <span className={`text-sm font-medium ${overallPL.isProfit ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      ({overallPL.isProfit ? '+' : ''}{overallPL.percentage.toFixed(1)}%)
+                    </span>
+                  </div>
+                </div>
 
-      {/* Garis Pemisah ke-2 */}
-      <div className="border-t border-slate-300/50 my-3"></div>
+                {/* Garis Pemisah ke-2 */}
+                <div className="border-t border-slate-300/50 my-3"></div>
 
-      {/* Stats Grid - 3 Kolom */}
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        {/* Total Assets */}
-        <div className="text-center">
-          <div className="text-xs text-slate-500 mb-1">Total Assets</div>
-          <div className="text-lg font-bold text-slate-800">{assets.length}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">registered</div>
-        </div>
+                {/* Stats Grid - 3 Kolom */}
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  {/* Total Assets */}
+                  <div className="text-center">
+                    <div className="text-xs text-slate-500 mb-1">Total Assets</div>
+                    <div className="text-lg font-bold text-slate-800">{assets.length}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">registered</div>
+                  </div>
 
-        {/* Average Value */}
-        <div className="text-center">
-          <div className="text-xs text-slate-500 mb-1">Average Value</div>
-          <div className="text-lg font-bold text-slate-800">
-            Rp {averageValue.toLocaleString("id-ID")}
+                  {/* Average Value */}
+                  <div className="text-center">
+                    <div className="text-xs text-slate-500 mb-1">Average Value</div>
+                    <div className="text-lg font-bold text-slate-800">
+                      Rp {averageValue.toLocaleString("id-ID")}
+                    </div>
+                  </div>
+
+                  {/* Largest Asset */}
+                  <div className="text-center">
+                    <div className="text-xs text-slate-500 mb-1">Largest Asset</div>
+                    <div className="text-sm font-bold text-slate-800 truncate">
+                      {largestAsset ? largestAsset.name : "N/A"}
+                    </div>
+                    <div className="text-xs text-slate-600">
+                      Rp {(largestAsset?.currentEstimatedValue || largestAsset?.value || 0).toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Space filler untuk push footer ke bawah */}
+                <div className="flex-1"></div>
+
+                {/* Footer */}
+                <div className="pt-4 border-t border-slate-200/50">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">Updated just now</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+                      <span className="text-xs font-medium text-slate-700">All active</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Largest Asset */}
-        <div className="text-center">
-          <div className="text-xs text-slate-500 mb-1">Largest Asset</div>
-          <div className="text-sm font-bold text-slate-800 truncate">
-            {largestAsset ? largestAsset.name : "N/A"}
-          </div>
-          <div className="text-xs text-slate-600">
-            Rp {(largestAsset?.currentEstimatedValue || largestAsset?.value || 0).toLocaleString("id-ID")}
-          </div>
-        </div>
-      </div>
-
-      {/* Space filler untuk push footer ke bawah */}
-      <div className="flex-1"></div>
-
-      {/* Footer */}
-      <div className="pt-4 border-t border-slate-200/50">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">Updated just now</span>
-          <div className="flex items-center gap-1.5">
-            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
-            <span className="text-xs font-medium text-slate-700">All active</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+          
           {/* ===== CARD KANAN: BREAKDOWN - TANPA SCROLL ===== */}
           <div className="relative bg-gradient-to-br from-emerald-50 via-white to-emerald-100/30 rounded-2xl p-6 shadow-lg border border-emerald-200/50 
             h-[480px] min-h-[480px] max-h-[480px] overflow-hidden flex flex-col">
@@ -503,7 +526,7 @@ export default function Assets() {
                 </div>
               </div>
 
-              {/* Footer info - TEKS DIHAPUS */}
+              {/* Footer info */}
               <div className="pt-4 mt-2 border-t border-slate-200/50">
                 <div className="text-xs text-slate-500 text-center">
                   {/* TEKS DIHAPUS */}
