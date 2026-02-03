@@ -2,7 +2,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import App from "./src/App";  // <-- TAMBAHKAN /src/
+import App from "./App";  // <-- TAMBAHKAN /src/
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
