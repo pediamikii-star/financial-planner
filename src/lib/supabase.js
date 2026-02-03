@@ -1,47 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 
 // ============================================
-// 1. GET ENVIRONMENT VARIABLES
+// 1. HARDCODE UNTUK TESTING - GANTI INI DULU
 // ============================================
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = 'https://wdpvrpiqzoovnfjubepf.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkcHZycGlxem9vdm5manViZXBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwNDI3NTAsImV4cCI6MjA4NTYxODc1MH0.Cb-2wB2mVx5V8ArrDFmBUO3xn-K9LrfGnsfjJSeqaMk'
+
+console.log('🔧 Supabase URL:', supabaseUrl)
+console.log('🔧 Supabase Key loaded:', !!supabaseAnonKey)
 
 // ============================================
-// 2. VALIDASI ENVIRONMENT VARIABLES (HANYA DI DEVELOPMENT)
+// 2. CREATE SUPABASE CLIENT
 // ============================================
-if (import.meta.env.DEV) {
-  if (!supabaseUrl) {
-    console.warn('⚠️  VITE_SUPABASE_URL is not defined in .env.local')
-    console.warn('Please add: VITE_SUPABASE_URL=https://your-project.supabase.co')
-  }
-
-  if (!supabaseAnonKey) {
-    console.warn('⚠️  VITE_SUPABASE_ANON_KEY is not defined in .env.local')
-    console.warn('Get it from: Supabase Dashboard → Settings → API → anon public key')
-  }
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('📝 Current values:')
-    console.warn('- VITE_SUPABASE_URL:', supabaseUrl || '(empty)')
-    console.warn('- VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '***set***' : '(empty)')
-  }
-}
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // ============================================
-// 3. CREATE SUPABASE CLIENT
-// ============================================
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
-
-// ============================================
-// 4. HELPER FUNCTION: GET CURRENT USER
+// 3. HELPER FUNCTION: GET CURRENT USER
 // ============================================
 export async function getCurrentUser() {
   try {
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.warn('Supabase not configured')
-      return null
-    }
-    
     const { data: { user }, error } = await supabase.auth.getUser()
     
     if (error) {
@@ -57,14 +34,14 @@ export async function getCurrentUser() {
 }
 
 // ============================================
-// 5. HELPER FUNCTION: CHECK IF ONLINE
+// 4. HELPER FUNCTION: CHECK IF ONLINE
 // ============================================
 export function isOnline() {
   return navigator.onLine
 }
 
 // ============================================
-// 6. AUTH STATE LISTENER
+// 5. AUTH STATE LISTENER
 // ============================================
 
 supabase.auth.onAuthStateChange(async (event, session) => {
@@ -101,30 +78,23 @@ supabase.auth.onAuthStateChange(async (event, session) => {
 });
 
 // ============================================
-// 7. TEST CONNECTION (Hanya di development)
+// 6. TEST CONNECTION
 // ============================================
-if (import.meta.env.DEV) {
-  setTimeout(async () => {
-    console.log('🔍 Testing Supabase connection...')
+setTimeout(async () => {
+  console.log('🔍 Testing Supabase connection...')
+  
+  try {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('count')
+      .limit(1)
     
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.warn('⚠️ Skipping test: Environment variables missing')
-      return
+    if (error) {
+      console.error('❌ Database test failed:', error.message)
+    } else {
+      console.log('✅ Supabase connection successful!')
     }
-    
-    try {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('count')
-        .limit(1)
-      
-      if (error) {
-        console.error('❌ Database test failed:', error.message)
-      } else {
-        console.log('✅ Supabase connection successful!')
-      }
-    } catch (error) {
-      console.error('❌ Connection test crashed:', error)
-    }
-  }, 3000)
-}
+  } catch (error) {
+    console.error('❌ Connection test crashed:', error)
+  }
+}, 3000)
