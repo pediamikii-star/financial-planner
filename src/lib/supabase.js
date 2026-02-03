@@ -7,34 +7,41 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // ============================================
-// 2. VALIDASI ENVIRONMENT VARIABLES
+// 2. VALIDASI ENVIRONMENT VARIABLES (HANYA DI DEVELOPMENT)
 // ============================================
-if (!supabaseUrl) {
-  console.error('❌ ERROR: VITE_SUPABASE_URL is not defined in .env.local')
-  console.error('Please add: VITE_SUPABASE_URL=https://your-project.supabase.co')
-}
+if (import.meta.env.DEV) {
+  if (!supabaseUrl) {
+    console.warn('⚠️  VITE_SUPABASE_URL is not defined in .env.local')
+    console.warn('Please add: VITE_SUPABASE_URL=https://your-project.supabase.co')
+  }
 
-if (!supabaseAnonKey) {
-  console.error('❌ ERROR: VITE_SUPABASE_ANON_KEY is not defined in .env.local')
-  console.error('Get it from: Supabase Dashboard → Settings → API → anon public key')
-}
+  if (!supabaseAnonKey) {
+    console.warn('⚠️  VITE_SUPABASE_ANON_KEY is not defined in .env.local')
+    console.warn('Get it from: Supabase Dashboard → Settings → API → anon public key')
+  }
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('📝 Current values:')
-  console.error('- VITE_SUPABASE_URL:', supabaseUrl || '(empty)')
-  console.error('- VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '***set***' : '(empty)')
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('📝 Current values:')
+    console.warn('- VITE_SUPABASE_URL:', supabaseUrl || '(empty)')
+    console.warn('- VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? '***set***' : '(empty)')
+  }
 }
 
 // ============================================
 // 3. CREATE SUPABASE CLIENT
 // ============================================
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '')
 
 // ============================================
 // 4. HELPER FUNCTION: GET CURRENT USER
 // ============================================
 export async function getCurrentUser() {
   try {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.warn('Supabase not configured')
+      return null
+    }
+    
     const { data: { user }, error } = await supabase.auth.getUser()
     
     if (error) {
@@ -101,7 +108,7 @@ if (import.meta.env.DEV) {
     console.log('🔍 Testing Supabase connection...')
     
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error('❌ Skipping test: Environment variables missing')
+      console.warn('⚠️ Skipping test: Environment variables missing')
       return
     }
     
